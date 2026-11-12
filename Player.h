@@ -50,7 +50,7 @@ private:
     Vector3 m_Facing{ 0.0f, 0.0f, 1.0f };
 
     void Swing();
-    void GainMiningXp(float xp);
+
 
 public:
     void Init() override;
@@ -61,8 +61,10 @@ public:
     void UpdateGround();
     void UpdateAttack();
 
-
     void SetAnimation(const char* AnimationName);
+    void GainMiningXp(float xp);
     int GetMineLevel() const { return m_MineLevel; }
+    float GetMineXp() const { return m_MineXp; }
+    float GetMinePower() const { return m_MinePower; }
 };
 

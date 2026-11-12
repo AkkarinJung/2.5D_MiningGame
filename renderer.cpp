@@ -26,7 +26,7 @@ ID3D11BlendState*		Renderer::m_BlendState{};
 ID3D11BlendState*		Renderer::m_BlendStateAdd{};
 ID3D11BlendState*		Renderer::m_BlendStateATC{};
 
-
+float Renderer::m_ClearColor[4] = { 0.04f, 0.03f, 0.03f, 1.0f };
 
 
 void Renderer::Init()
@@ -50,22 +50,21 @@ void Renderer::Init()
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.Windowed = TRUE;
 
-	hr = D3D11CreateDeviceAndSwapChain( NULL,
-										D3D_DRIVER_TYPE_HARDWARE,
-										NULL,
-										0,
-										NULL,
-										0,
-										D3D11_SDK_VERSION,
-										&swapChainDesc,
-										&m_SwapChain,
-										&m_Device,
-										&m_FeatureLevel,
-										&m_DeviceContext );
-
-
-
-
+	UINT flags = 0;
+#ifdef _DEBUG
+	flags |= D3D11_CREATE_DEVICE_DEBUG;   // needs Windows "Graphics Tools" (Optional features)
+#endif
+	hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, flags,
+		NULL, 0, D3D11_SDK_VERSION, &swapChainDesc,
+		&m_SwapChain, &m_Device, &m_FeatureLevel, &m_DeviceContext);
+	if (FAILED(hr) && flags != 0)
+	{
+		OutputDebugStringA("D3D11 debug layer missing: install Graphics Tools\n");
+		hr = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0,
+			NULL, 0, D3D11_SDK_VERSION, &swapChainDesc,
+			&m_SwapChain, &m_Device, &m_FeatureLevel, &m_DeviceContext);
+	}
+	assert(SUCCEEDED(hr));
 
 
 	// レンダーターゲットビュー作成
@@ -281,8 +280,7 @@ void Renderer::Uninit()
 
 void Renderer::Begin()
 {
-	float clearColor[4] = { 2.0f, 0.0f, 0.0f, 1.0f };
-	m_DeviceContext->ClearRenderTargetView( m_RenderTargetView, clearColor );
+	m_DeviceContext->ClearRenderTargetView(m_RenderTargetView, m_ClearColor);
 	m_DeviceContext->ClearDepthStencilView( m_DepthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 }
 

@@ -62,7 +62,7 @@ private:
 	static ID3D11BlendState*		m_BlendStateAdd;
 	static ID3D11BlendState*		m_BlendStateATC;
 
-
+	static float m_ClearColor[4];
 
 public:
 	static void Init();
@@ -88,4 +88,6 @@ public:
 
 	static void CreateVertexShader(ID3D11VertexShader** VertexShader, ID3D11InputLayout** VertexLayout, const char* FileName);
 	static void CreatePixelShader(ID3D11PixelShader** PixelShader, const char* FileName);
+
+	static float* GetClearColor() { return m_ClearColor; }
 };

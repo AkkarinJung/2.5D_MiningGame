@@ -7,6 +7,7 @@
 #include "Game.h"
 #include "Result.h"
 #include "audio.h"
+#include "DebugUI.h"
 
 #include "GameObject.h"
 
@@ -19,6 +20,7 @@ float Manager::m_ChangeTime = 0.0f;
 void Manager::Init()
 {
 	Renderer::Init();
+	DebugUI::Init();
 	Input::Init();
 	Audio::InitMaster();
 
@@ -40,6 +42,7 @@ void Manager::Uninit()
 	}
 	m_GameObjects.clear();
 
+	DebugUI::Uninit();
 	Audio::UninitMaster();
 	Renderer::Uninit();
 	Input::Uninit();
@@ -127,5 +130,6 @@ void Manager::Draw()
 			}
 		}
 	}
+	DebugUI::Draw();
 	Renderer::End();
 }

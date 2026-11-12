@@ -1,6 +1,7 @@
 
 #include "main.h"
 #include "input.h"
+#include "DebugUI.h"
 
 
 BYTE Input::m_OldKeyState[256];
@@ -27,6 +28,8 @@ void Input::Update()
 	memcpy( m_OldKeyState, m_KeyState, 256 );
 
 	GetKeyboardState( m_KeyState );
+	if (DebugUI::WantsKeyboard())
+		memset(m_KeyState, 0, 256);
 
 }
 

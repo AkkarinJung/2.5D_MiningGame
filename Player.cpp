@@ -9,6 +9,7 @@
 #include "Manager.h"
 #include "Camera.h"
 #include "audio.h"
+#include "DebugUI.h"
 
 #include "Enemy.h"
 #include "Tree.h"
@@ -317,18 +318,12 @@ void Player::Swing()
         const MineResult result = map->MineBlock(x, z, m_MinePower, m_MineLevel);
 
         if (result.tooHard)
-        {
-            char text[96];
-            sprintf_s(text, "Too hard! %s needs mining Lv%d\n",
+            DebugUI::Log("Too hard! %s needs mining Lv%d",
                 kOre[result.grade].name, kOre[result.grade].requiredLevel);
-            OutputDebugStringA(text);
-        }
         if (result.broken)
         {
-            char text[96];
-            sprintf_s(text, "You dug out %s. (%d blocks left)\n",
+            DebugUI::Log("You dug out %s. (%d blocks left)",
                 kOre[result.grade].name, map->GetBlocksLeft());
-            OutputDebugStringA(text);
             GainMiningXp((float)kOre[result.grade].xp);
         }
     }
@@ -344,9 +339,7 @@ void Player::GainMiningXp(float xp)
         m_MineLevel++;
         m_MinePower += 1.0f;
 
-        char text[64];
-        sprintf_s(text, "Mining Lv%d! (power %.0f)\n", m_MineLevel, m_MinePower);
-        OutputDebugStringA(text);
+        DebugUI::Log("Mining Lv%d! (power %.0f)", m_MineLevel, m_MinePower);
         // M5: queue a card pick here, tagged with this ore grade
     }
 

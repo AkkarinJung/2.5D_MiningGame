@@ -128,6 +128,9 @@ void TileMap::Init()
     m_Tiles.reserve(W * H);
     m_Dist.reserve(W * H);
     m_VisibleWalls.reserve(W * H);
+    m_OreGrade.reserve(W * H);
+    m_BlockHp.reserve(W * H);
+    m_BlockDamage.reserve(W * H);
 
     Generate(std::random_device{}(), 1);
 }
@@ -280,6 +283,7 @@ void TileMap::Generate(uint32_t seed, int floorNo)
             if (nearOpen)
                 m_VisibleWalls.push_back(z * W + x);
         }
+    PlaceOre(seed, floorNo);
 }
 
 // 7. Ore veins on tiles more than 2 steps from the start; rarer grades deeper.

@@ -1,0 +1,674 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Deepvein 2.5D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+1+Code:wght@400;600&family=Pixelify+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-screen 2.5D game. Status strip + card deck on top, WebGL dungeon with a 2D text overlay in the middle, log below. Single dark look by design. */
+:root{
+  --bg:#0e0b0a; --panel:#1a1513; --line:#3a2f29; --fg:#eadfce; --dim:#9b8b7a;
+  --lamp:#e0a83a; --gem:#6fdcea; --blood:#d0554f; --xp:#b9e07a;
+  --r0:#9b8b7a; --r1:#6fa8e0; --r2:#d58cf0;
+  --f-display:"Pixelify Sans", ui-monospace, monospace;
+  --f-body:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:dark;
+}
+html:lang(ja){--f-display:"DotGothic16","Hiragino Kaku Gothic ProN","Yu Gothic",monospace;--f-body:"M PLUS 1 Code","Hiragino Kaku Gothic ProN","Yu Gothic",ui-monospace,monospace}
+html,body{height:100%;background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:13px;overflow:hidden;-webkit-user-select:none;user-select:none}
+#app{height:100%;display:flex;flex-direction:column;gap:8px;padding-block:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));box-sizing:border-box;max-width:1180px;margin:0 auto}
+.hud{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.brand{font-family:var(--f-display);font-size:20px;color:var(--lamp);margin-right:auto;line-height:1}
+.brand small{font-size:11px;color:var(--gem);margin-left:6px}
+#clsChip{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);padding:3px 8px;color:var(--lamp)}
+.stat{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.stat b{font-family:var(--f-display);font-weight:400;font-size:11px;color:var(--dim)}
+.stat span{font-weight:600}
+.bar{width:110px;height:10px;background:#2a1f1c;border:1px solid var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--blood);transition:width .15s}
+.xpb{display:block;width:48px;height:5px;background:#2a1f1c;border:1px solid var(--line)}.xpb b{display:block;height:100%;width:0;background:var(--xp);transition:width .2s}
+#sml{color:var(--xp)}
+button{font-family:var(--f-display);font-size:13px;color:var(--fg);background:var(--panel);border:1px solid var(--line);padding:6px 10px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--lamp);color:var(--lamp)}
+button:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+button:disabled{opacity:.4;cursor:not-allowed}
+#langBtn{color:var(--gem);font-size:12px}
+#skBtn{position:relative;overflow:hidden;min-width:110px}
+#skBtn::after{content:"";position:absolute;inset:0;background:rgba(0,0,0,.6);transform-origin:left;transform:scaleX(var(--cd,0))}
+#skBtn span{position:relative;z-index:1}
+#deck{display:flex;gap:6px;flex-wrap:wrap;min-height:22px;align-items:center}
+#deck:empty::before{content:attr(data-empty);color:var(--dim);font-size:11px}
+.chip{font-size:11px;border:1px solid var(--line);border-left:3px solid var(--rc);padding:2px 6px;background:var(--panel);white-space:nowrap}
+.chip em{font-style:normal;color:var(--dim)}
+#stage{position:relative;flex:1;min-height:0;border:1px solid var(--line);background:#070505;overflow:hidden}
+#gl,#fx{position:absolute;inset:0;width:100%;height:100%;display:block}
+#gl{cursor:crosshair;touch-action:none}
+#fx{pointer-events:none}
+.foot{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+#log{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;min-height:56px;font-size:12px;line-height:1.35}
+#log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.keys{color:var(--dim);font-size:11px;line-height:1.7}
+.keys kbd{font-family:var(--f-body);border:1px solid var(--line);padding:0 4px;color:var(--fg);background:var(--panel)}
+#touch{position:absolute;inset:0;pointer-events:none;display:none}
+#joy{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:14px;width:116px;height:116px;border-radius:50%;border:2px solid rgba(234,223,206,.22);background:rgba(26,21,19,.4);pointer-events:auto;touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px;border-radius:50%;background:rgba(224,168,58,.55)}
+.tb{position:absolute;pointer-events:auto;touch-action:none;border-radius:50%;padding:0;background:rgba(26,21,19,.6);border:2px solid rgba(234,223,206,.3)}
+#tA{right:calc(14px + env(safe-area-inset-right,0px));bottom:22px;width:82px;height:82px}
+#tS{right:calc(104px + env(safe-area-inset-right,0px));bottom:14px;width:62px;height:62px;font-size:12px}
+#tQ{right:calc(30px + env(safe-area-inset-right,0px));bottom:116px;width:50px;height:50px;font-size:11px}
+@media (hover:none){#touch{display:block}.keys{display:none}}
+@media (max-width:760px){.stat.opt{display:none}.bar{width:80px}}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(7,5,5,.76);padding:16px;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);max-width:420px;width:100%;padding:18px;display:flex;flex-direction:column;gap:12px}
+h2{font-family:var(--f-display);font-weight:400;font-size:22px;margin:0;color:var(--lamp);text-wrap:balance}
+.card p,.pick p{margin:0;color:var(--dim);line-height:1.6}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row button{flex:1;padding:9px 12px}
+.pick{display:flex;flex-direction:column;gap:12px;align-items:center;max-width:860px;width:100%;text-align:center;margin:auto}
+.odds{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-family:var(--f-display);font-size:14px}
+.hand{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:12px;width:100%}
+@media (max-width:640px){.hand{grid-template-columns:1fr 1fr}}
+.cardbtn{--rc:var(--r0);display:flex;flex-direction:column;gap:8px;align-items:flex-start;text-align:left;padding:14px;min-height:130px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--rc) 16%,var(--panel)),var(--panel) 60%);border:2px solid color-mix(in srgb,var(--rc) 60%,var(--line));
+  font-family:var(--f-body);font-size:12px;animation:deal .35s both}
+.cardbtn:nth-child(2){animation-delay:.06s}.cardbtn:nth-child(3){animation-delay:.12s}.cardbtn:nth-child(4){animation-delay:.18s}
+.cardbtn:hover{border-color:var(--rc);color:var(--fg);transform:translateY(-3px)}
+.cardbtn .rar{font-family:var(--f-display);font-size:11px;color:var(--rc);display:flex;justify-content:space-between;width:100%;gap:6px}
+.cardbtn .nm{font-family:var(--f-display);font-size:17px;color:var(--fg)}
+.cardbtn .ds{color:var(--dim);line-height:1.5}
+.cardbtn .own{margin-top:auto;font-size:11px;color:var(--dim)}
+.cls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%}
+@media (max-width:860px){.cls{grid-template-columns:1fr 1fr}}
+@media (max-width:440px){.cls{grid-template-columns:1fr}}
+.clsbtn{display:flex;flex-direction:column;gap:8px;align-items:flex-start;text-align:left;padding:14px;font-family:var(--f-body);font-size:12px;animation:deal .35s both;background:color-mix(in srgb,var(--panel) 92%,transparent)}
+.clsbtn:nth-child(2){animation-delay:.05s}.clsbtn:nth-child(3){animation-delay:.1s}.clsbtn:nth-child(4){animation-delay:.15s}
+.clsbtn img{width:56px;height:56px;image-rendering:pixelated;background:#241e1b;border:1px solid var(--line)}
+.clsbtn .nm{font-family:var(--f-display);font-size:20px;color:var(--fg);display:flex;justify-content:space-between;width:100%}
+.clsbtn .nm small{font-size:11px;color:var(--dim)}
+.clsbtn .ds{color:var(--dim);line-height:1.5}
+.st{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;width:100%;align-items:center;font-size:11px;color:var(--dim)}
+.st i{display:block;height:6px;background:#2a1f1c}.st i b{display:block;height:100%;background:var(--lamp)}
+.sk{border-top:1px dashed var(--line);padding-top:8px;width:100%;line-height:1.5}
+.sk b{font-family:var(--f-display);font-weight:400;color:var(--gem)}
+.logo{font-family:var(--f-display);font-size:clamp(30px,6vw,52px);color:var(--lamp);line-height:1;text-shadow:0 3px 0 #5a3d29}
+.logo small{display:block;font-size:.32em;color:var(--gem);text-shadow:none;margin-top:6px;letter-spacing:.2em}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .35s}
+#err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;color:var(--dim)}
+@keyframes deal{from{opacity:.2;transform:translateY(14px) rotate(-2deg)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.cardbtn,.clsbtn{animation:none}#fade{transition:none}}
+</style>
+
+<div id="app">
+  <header class="hud">
+    <div class="brand"><span id="tBrand"></span><small>2.5D</small></div>
+    <span id="clsChip"></span>
+    <div class="stat"><div class="bar"><i id="hpbar"></i></div><span id="hpt">-</span></div>
+    <div class="stat"><b id="lFloor"></b><span id="sd">-</span></div>
+    <div class="stat"><b id="lMlv"></b><span id="sml">1</span><i class="xpb"><b id="xpf"></b></i></div>
+    <div class="stat opt"><b id="lAtk"></b><span id="sk">-</span></div>
+    <div class="stat opt"><b id="lMine"></b><span id="sm">-</span></div>
+    <div class="stat opt"><b id="lArm"></b><span id="sa">-</span></div>
+    <button id="skBtn"><span id="skName"></span></button>
+    <button id="potBtn"><span id="lPot"></span> ×<span id="sq">0</span></button>
+    <button id="rsBtn"></button>
+    <button id="langBtn"></button>
+  </header>
+  <div id="deck"></div>
+  <div id="stage">
+    <canvas id="gl"></canvas><canvas id="fx"></canvas>
+    <div id="touch"><div id="joy"><div id="knob"></div></div><button class="tb" id="tA"></button><button class="tb" id="tS"></button><button class="tb" id="tQ"></button></div>
+    <div id="fade"></div>
+    <div id="ov"></div>
+  </div>
+  <div class="foot"><div id="log"></div><div class="keys" id="keysHelp"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const stage=$('#stage'),glc=$('#gl'),fxc=$('#fx'),fx=fxc.getContext('2d'),ov=$('#ov');
+const W=36,H=28,F=0,WALL=1,NODE=2,STAIR=4;
+const R=n=>Math.floor(Math.random()*n),rnd=(a,b)=>a+Math.random()*(b-a);
+const I=(x,y)=>y*W+x,T=(x,y)=>(x<0||y<0||x>=W||y>=H)?WALL:map[I(x|0,y|0)];
+const DIRS=[[0,-1],[1,0],[0,1],[-1,0]];
+const blocksMove=t=>t===WALL||t===NODE,isBlock=t=>t===NODE;
+const adiff=(a,b)=>{let d=a-b;while(d>Math.PI)d-=Math.PI*2;while(d<-Math.PI)d+=Math.PI*2;return Math.abs(d)};
+const RC=['var(--r0)','var(--r1)','var(--r2)'];
+
+/* ---------- language ---------- */
+let lang='en';try{lang=localStorage.getItem('deepvein-lang')||''}catch(e){}
+if(lang!=='ja'&&lang!=='en')lang=(navigator.language||'').toLowerCase().startsWith('ja')?'ja':'en';
+const ja=()=>lang==='ja';
+function bi(o){for(const k of Object.keys(o)){const v=o[k];if(v&&typeof v==='object'&&'ja' in v&&'en' in v)Object.defineProperty(o,k,{get:()=>v[lang],enumerable:true,configurable:true})}return o}
+const RARS={ja:['コモン','レア','エピック'],en:['Common','Rare','Epic']};
+const UI={
+  ja:{brand:'ディープヴェイン',floor:'階層',mlv:'採掘Lv',atk:'攻撃',mine:'採掘',arm:'防御',skill:'スキル',pot:'回復薬',rs:'リスタート',lang:'English',tA:'攻撃',tS:'技',tQ:'薬',noCls:'職業未選択',
+      empty:'カードはまだない。採掘レベルが上がるとカードを1枚選べる。',
+      keys:'<kbd>WASD</kbd> 移動 &nbsp; <kbd>左クリック</kbd>/<kbd>J</kbd> 攻撃・採掘(長押し)<br><kbd>右クリック</kbd>/<kbd>K</kbd> スキル &nbsp; <kbd>Q</kbd> 回復薬 &nbsp; <kbd>R</kbd> リスタート &nbsp; <kbd>1</kbd>〜<kbd>4</kbd> 選択'},
+  en:{brand:'Deepvein',floor:'Floor',mlv:'Mine Lv',atk:'Atk',mine:'Mine',arm:'Armor',skill:'Skill',pot:'Potion',rs:'Restart',lang:'日本語',tA:'ATK',tS:'SKILL',tQ:'HEAL',noCls:'No class',
+      empty:'No cards yet. Each mining level-up lets you pick one.',
+      keys:'<kbd>WASD</kbd> move &nbsp; hold <kbd>Left click</kbd>/<kbd>J</kbd> attack &amp; mine<br><kbd>Right click</kbd>/<kbd>K</kbd> skill &nbsp; <kbd>Q</kbd> potion &nbsp; <kbd>R</kbd> restart &nbsp; <kbd>1</kbd>–<kbd>4</kbd> choose'}
+};
+const fmtFloor=d=>ja()?`B${d}F`:`${d}`;
+
+/* ---------- classes ---------- */
+const CLASSES={
+  warrior:{n:{ja:'戦士',en:'Warrior'},d:{ja:'剣で前方を広く薙ぎ払う。体力が高く、正面から戦える。',en:'Sweeps a wide arc with a sword. Tough enough to fight head-on.'},hp:30,spd:4.2,atk:4,mine:2,cd:.45,range:1.4,arc:1.9,type:'melee',
+    sk:{ja:'旋風斬',en:'Whirlwind'},skd:{ja:'周囲を一回転して斬る。ブロックも削る。',en:'Spin and slash everything around you, blocks included.'},skcd:4,wc:'#d8dce6',ps:{ja:'被弾後の無敵時間が長い',en:'Longer invincibility after a hit'},inv:1},
+  miner:{n:{ja:'鉱夫',en:'Miner'},d:{ja:'ツルハシで岩を砕く採掘のプロ。ブロックがすぐ壊れる。',en:'A pickaxe pro. Blocks crumble in a couple of swings.'},hp:24,spd:4,atk:3,mine:5,cd:.4,range:1.15,arc:1.3,type:'melee',
+    sk:{ja:'ダイナマイト',en:'Dynamite'},skd:{ja:'爆弾を投げて、敵もブロックもまとめて吹き飛ばす。',en:'Throw a bomb that blasts monsters and blocks alike.'},skcd:5,wc:'#ffd08a',ps:{ja:'カードの選択肢が4枚・採掘経験値1.5倍',en:'4 card choices, 1.5× mining XP'},inv:.6},
+  mage:{n:{ja:'魔法使い',en:'Mage'},d:{ja:'魔法弾で遠くから撃つ。打たれ弱いが安全に削れる。',en:'Fires magic bolts from range. Fragile, but rarely in reach.'},hp:16,spd:4.2,atk:4,mine:2,cd:.5,type:'bolt',
+    sk:{ja:'氷結ノヴァ',en:'Frost Nova'},skd:{ja:'周囲の敵にダメージを与え、凍らせて鈍らせる。',en:'Damage nearby monsters and freeze them to a crawl.'},skcd:6,wc:'#8f6be0',ps:{ja:'遠距離攻撃',en:'Ranged attacks'},inv:.6},
+  rogue:{n:{ja:'盗賊',en:'Rogue'},d:{ja:'短剣の素早い連撃。足が速く、会心が出やすい。',en:'Rapid dagger strikes. Fast on foot and crits often.'},hp:18,spd:5.6,atk:2,mine:2,cd:.2,range:1.05,arc:1.4,type:'melee',
+    sk:{ja:'影走り',en:'Shadow Dash'},skd:{ja:'無敵のまま突進し、通り道の敵を斬る。',en:'Dash while invincible, cutting everything in your path.'},skcd:2.5,wc:'#cfeedd',ps:{ja:'会心率 +15%',en:'+15% crit chance'},inv:.6}
+};
+Object.values(CLASSES).forEach(bi);const CLS_IDS=Object.keys(CLASSES);
+
+/* ---------- data ---------- */
+const ORE=[
+  {n:{ja:'銅鉱石',en:'Copper Ore'},c:'#e8925a',hi:'#f2c08a',req:1,xp:4,hp:8,w:[72,25,3]},
+  {n:{ja:'銀鉱石',en:'Silver Ore'},c:'#cfd6e0',hi:'#ffffff',req:2,xp:8,hp:12,w:[42,46,12]},
+  {n:{ja:'金鉱石',en:'Gold Ore'},c:'#ffc94a',hi:'#fff1b0',req:4,xp:14,hp:17,w:[16,52,32]},
+  {n:{ja:'クリスタル',en:'Crystal'},c:'#6fdcea',hi:'#c6f6fa',req:6,xp:24,hp:22,w:[3,40,57]}
+].map(bi);
+const xpNeed=l=>8+(l-1)*7;
+const MT={
+  slime:{hp:8,atk:2,spd:1,sight:6,n:{ja:'洞窟スライム',en:'Cave Slime'},r:.32,h:.8,ai:'hop'},
+  bat:{hp:4,atk:1,spd:3.3,sight:8,n:{ja:'闇コウモリ',en:'Gloom Bat'},r:.25,h:.75,ai:'bat'},
+  goblin:{hp:12,atk:3,spd:2.7,sight:9,n:{ja:'ゴブリン',en:'Goblin'},r:.3,h:1,ai:'chase'},
+  brute:{hp:32,atk:5,spd:1.3,sight:7,n:{ja:'岩の巨人',en:'Stone Brute'},r:.44,h:1.5,ai:'brute'}
+};Object.values(MT).forEach(bi);
+const CARDS=[
+  {id:'atk',n:{ja:'剛腕',en:'Heavy Arm'},r:0,d:{ja:'攻撃力+1。',en:'+1 attack.'},f:()=>P.atk++},
+  {id:'pick',n:{ja:'鋭いツルハシ',en:'Sharp Pick'},r:0,d:{ja:'採掘力+2。ブロックが早く壊れる。',en:'+2 mining. Blocks break faster.'},f:()=>P.mine+=2},
+  {id:'hide',n:{ja:'頑丈な皮膚',en:'Tough Hide'},r:0,d:{ja:'最大HP+6、HPを6回復。',en:'+6 max HP and heal 6.'},f:()=>{P.max+=6;P.hp=Math.min(P.max,P.hp+6)}},
+  {id:'spd',n:{ja:'俊足',en:'Fleet Foot'},r:0,d:{ja:'移動速度+12%。',en:'+12% move speed.'},max:3,f:()=>P.spd*=1.12},
+  {id:'aspd',n:{ja:'早業',en:'Quick Hands'},r:0,d:{ja:'攻撃速度+15%。',en:'+15% attack speed.'},max:3,f:()=>P.aspd+=.15},
+  {id:'lamp',n:{ja:'明るいランプ',en:'Bright Lamp'},r:0,d:{ja:'ランプの光が遠くまで届く。',en:'Your lamp reaches further.'},max:3,f:()=>P.light++},
+  {id:'tonic',n:{ja:'薬袋',en:'Potion Pouch'},r:0,d:{ja:'回復薬+2。1本で最大HPの40%を回復。',en:'+2 potions. Each heals 40% of max HP.'},f:()=>P.potions+=2},
+  {id:'mend',n:{ja:'再起',en:'Second Wind'},r:0,d:{ja:'今すぐHPを全回復。',en:'Heal to full right now.'},once:true,f:()=>P.hp=P.max},
+  {id:'armor',n:{ja:'鉄の肌',en:'Iron Skin'},r:1,d:{ja:'防御+1。受けるダメージが1減る。',en:'+1 armor. Every hit you take is 1 lower.'},max:4,f:()=>P.armor++},
+  {id:'leech',n:{ja:'吸血',en:'Leech'},r:1,d:{ja:'敵を倒すたびにHPを2回復。',en:'Heal 2 HP whenever you kill a monster.'},f:()=>P.leech+=2},
+  {id:'keen',n:{ja:'会心の刃',en:'Keen Edge'},r:1,d:{ja:'会心率+15%。会心はダメージ2倍。',en:'+15% crit chance. Crits deal double damage.'},max:3,f:()=>P.crit+=.15},
+  {id:'thorns',n:{ja:'トゲの鎧',en:'Thorns'},r:1,d:{ja:'触れてきた敵に4ダメージを返す。',en:'Monsters that touch you take 4 damage.'},f:()=>P.thorns+=4},
+  {id:'area',n:{ja:'広刃',en:'Broad Blade'},r:1,d:{ja:'攻撃範囲+20%。',en:'+20% attack reach.'},max:3,f:()=>P.area+=.2},
+  {id:'cdr',n:{ja:'集中',en:'Focus'},r:1,d:{ja:'スキルのクールダウン-20%。',en:'-20% skill cooldown.'},max:3,f:()=>P.cdr*=.8},
+  {id:'luck',n:{ja:'鉱脈探し',en:'Prospector'},r:1,d:{ja:'レベルアップ時にレアなカードが出やすくなる。',en:'Level-up cards lean rarer.'},max:3,f:()=>P.luck+=.12},
+  {id:'twin',n:{ja:'二連撃',en:'Twin Strike'},r:2,d:{ja:'30%の確率で攻撃がもう1回発動する。',en:'30% chance for each attack to fire twice.'},max:2,f:()=>P.twin+=.3},
+  {id:'quake',n:{ja:'余震',en:'Aftershock'},r:2,d:{ja:'ブロックを壊すと周囲2マスの敵に8ダメージ。',en:'Breaking a block deals 8 damage to monsters within 2 tiles.'},f:()=>P.quake+=8},
+  {id:'exec',n:{ja:'処刑人',en:'Executioner'},r:2,d:{ja:'HPが25%を切った敵を一撃で仕留める。',en:'Instantly finish monsters below 25% HP.'},max:1,f:()=>P.exec=true},
+  {id:'greed',n:{ja:'大鉱脈',en:'Motherlode'},r:2,d:{ja:'次の階から、金鉱石とクリスタルがずっと出やすくなる。',en:'From the next floor on, gold ore and crystal appear far more often.'},max:1,f:()=>P.motherlode=true},
+  {id:'wave',n:{ja:'剣気',en:'Sword Wave'},r:2,cls:'warrior',d:{ja:'攻撃のたびに、敵を貫く斬撃波が飛ぶ。',en:'Every swing launches a piercing slash wave.'},max:1,f:()=>P.wave=true},
+  {id:'chain',n:{ja:'連鎖爆破',en:'Chain Blast'},r:2,cls:'miner',d:{ja:'壊したブロックが爆発し、周りのブロックも巻き込む。',en:'Broken blocks explode and set off the blocks around them.'},max:1,f:()=>P.chain=true},
+  {id:'big',n:{ja:'大型爆弾',en:'Big Bomb'},r:1,cls:'miner',d:{ja:'ダイナマイトの爆発範囲+40%。',en:'+40% dynamite blast radius.'},max:2,f:()=>P.blast*=1.4},
+  {id:'split',n:{ja:'分裂弾',en:'Split Bolt'},r:2,cls:'mage',d:{ja:'魔法弾が3方向に飛ぶ。',en:'Magic bolts fire in 3 directions.'},max:1,f:()=>P.split=true},
+  {id:'poison',n:{ja:'毒刃',en:'Venom Blade'},r:2,cls:'rogue',d:{ja:'攻撃が毒を与え、3秒間ダメージを与え続ける。',en:'Attacks poison, dealing damage over 3 seconds.'},max:1,f:()=>P.poison=true}
+];CARDS.forEach(bi);
+
+/* ---------- pixel art -> textures ---------- */
+function cvs(w,h,fn){const c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'));return c}
+function sprite(pal,rows){return cvs(8,8,g=>rows.forEach((r,y)=>[...r].forEach((ch,x)=>{if(pal[ch]){g.fillStyle=pal[ch];g.fillRect(x,y,1,1)}})))}
+function tex(c,rx=1,ry=1){const t=new THREE.CanvasTexture(c);t.magFilter=t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;t.encoding=THREE.sRGBEncoding;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);return t}
+const noise=(g,n,cols)=>{for(let y=0;y<n;y++)for(let x=0;x<n;x++){const r=Math.random();g.fillStyle=r<.55?cols[0]:r<.8?cols[1]:cols[2];g.fillRect(x,y,1,1)}};
+const C_FLOOR=cvs(16,16,g=>{noise(g,16,['#2d2724','#342d29','#28221f']);g.fillStyle='#1c1716';g.fillRect(0,15,16,1);g.fillRect(15,0,1,16);g.fillRect(0,7,16,1);g.fillRect(7,0,1,7);g.fillRect(11,8,1,7)});
+const C_WALL=cvs(16,16,g=>{noise(g,16,['#3b3337','#433a3e','#342d31']);g.fillStyle='#1d181a';for(const y of[3,7,11,15])g.fillRect(0,y,16,1);
+  for(let r=0;r<4;r++)for(const x of(r%2?[3,11]:[7,15]))g.fillRect(x,r*4,1,3);g.fillStyle='#4b4246';for(const y of[0,4,8,12])g.fillRect(0,y,16,1)});
+function oreCanvas(base,c1,c2,n){return cvs(16,16,g=>{noise(g,16,base);for(let k=0;k<n;k++){const x=1+R(13),y=1+R(13);g.fillStyle=c1;g.fillRect(x-1,y,3,1);g.fillRect(x,y-1,1,3);g.fillStyle=c2;g.fillRect(x,y,1,1)}})}
+const STONE=['#5d5a5f','#6e6b71','#4b494f'];
+const C_ORE=[oreCanvas(STONE,'#b8683a','#f2a46b',6),oreCanvas(STONE,'#9aa3ad','#ffffff',6),oreCanvas(['#6e6458','#7a6f61','#574e45'],'#d49a1e','#fff1b0',9)];
+const SPR={
+  warrior:sprite({h:'#c9ccd6',v:'#7b8090',s:'#e6b98f',e:'#1a1410',b:'#b8443c',d:'#2b2220',w:'#e8ecf4'},["..hhhh.w",".hhvvhhw","..ssss.w","..esse.w",".bbbbbbw","s.bbbb.s","..bbbb..","..d..d.."]),
+  miner:sprite({h:'#e0a83a',l:'#fff3b0',s:'#e6b98f',e:'#1a1410',b:'#3d6fa8',d:'#2b2220',p:'#b0b4bc',k:'#6a4a2e'},["..hhhh..",".hhhlhh.","..ssss.p","..esse.k",".bbbbbbk","s.bbbb.s","..bbbb..","..d..d.."]),
+  mage:sprite({h:'#6b4fb8',t:'#e0a83a',s:'#e6b98f',e:'#1a1410',b:'#4a3a8c',d:'#2b2220',o:'#d6c2ff',k:'#6a4a2e'},["...hh..o","..hhht.k",".hhhhhhk","..esse.k",".bbbbbbk","s.bbbb.s",".bbbbbb.","bbbbbbbb"]),
+  rogue:sprite({h:'#2f5a45',s:'#e6b98f',e:'#1a1410',r:'#c25a5a',b:'#3b3a40',d:'#2b2220',w:'#cfd8dc'},["..hhhh..",".hhhhhh.",".hesseh.","..rrrr..",".bbbbbb.","s.bbbb.w","..bbbb..","..d..d.."]),
+  slime:sprite({p:'#9a6be0',w:'#d6c2ff',e:'#1a1024'},["........","........","..pppp..",".pwpppp.",".peppep.","pppppppp","pppppppp",".pppppp."]),
+  bat:sprite({r:'#c25a5a',y:'#ffd166'},["........","........","r.r..r.r","rrrrrrrr","rryrryrr",".rrrrrr.","r..rr..r","........"]),
+  goblin:sprite({g:'#7d8c3a',r:'#ff5a4a',t:'#6a4a2e'},["..g..g..","..gggg..",".grggrg.","..gggg..",".tttttt.","g.tttt.g","..tttt..","..t..t.."]),
+  brute:sprite({o:'#8d8f99',k:'#1a1414',t:'#5b4636',w:'#e8e0d0'},["..oooo..",".oooooo.",".okooko.",".owwwwo.","oooooooo","otttttto",".tt..tt.","oo....oo"]),
+  bomb:sprite({r:'#b8443c',d:'#7a2a24',f:'#fff3b0',k:'#3b3337'},["......f.",".....k..","..rrrk..",".rrrrr..",".rdrrr..",".rrrrr..","..rrr...","........"]),
+  potion:sprite({g:'#cfd8dc',r:'#d0554f',w:'#ffb3a8',k:'#6a4a2e'},["........","...kk...","...gg...","..rrrr..",".rrwrrr.",".rrrrrr.",".rrrrrr.","..rrrr.."])
+};
+
+/* ---------- three.js scene ---------- */
+let renderer,scene,camera,lamp,flash,crysL,amb,levelG,planeGeo,blobGeo,blobMat,boxGeo,debGeo,debMats={},matFloor,matWall,matOre,matCrys,ray,floorPlane;
+let boltGeo,boltMat,glowGeo,glowMat,waveGeo,waveMat;
+const TC={};
+function initGL(){
+  renderer=new THREE.WebGLRenderer({canvas:glc,antialias:true});
+  renderer.outputEncoding=THREE.sRGBEncoding;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  scene=new THREE.Scene();scene.background=new THREE.Color(0x0a0706);scene.fog=new THREE.Fog(0x0a0706,11,21);
+  camera=new THREE.PerspectiveCamera(40,1,.1,100);
+  amb=new THREE.AmbientLight(0x6a5a78,.42);scene.add(amb);
+  const moon=new THREE.DirectionalLight(0x7088b0,.18);moon.position.set(-4,10,6);scene.add(moon);
+  lamp=new THREE.PointLight(0xffb866,2.2,11,1.5);lamp.castShadow=true;lamp.shadow.mapSize.set(512,512);lamp.shadow.bias=-.005;lamp.shadow.camera.near=.1;scene.add(lamp);
+  flash=new THREE.PointLight(0xffa050,0,8,2);scene.add(flash);
+  crysL=[0,1,2,3].map(()=>{const l=new THREE.PointLight(0x6fdcea,0,4.5,2);scene.add(l);return l});
+  planeGeo=new THREE.PlaneGeometry(1,1);planeGeo.translate(0,.5,0);
+  blobGeo=new THREE.CircleGeometry(.5,20);blobGeo.rotateX(-Math.PI/2);
+  blobMat=new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.45,depthWrite:false});
+  boxGeo=new THREE.BoxGeometry(1,1,1);debGeo=new THREE.BoxGeometry(.11,.11,.11);
+  matFloor=new THREE.MeshLambertMaterial({map:tex(C_FLOOR,W,H)});
+  matWall=new THREE.MeshLambertMaterial({map:tex(C_WALL)});
+  matOre=C_ORE.map((c,k)=>new THREE.MeshLambertMaterial({map:tex(c),emissive:k===2?0x2a1a00:0x000000}));
+  matCrys=new THREE.MeshStandardMaterial({color:0x3fb6c8,emissive:0x1d8090,emissiveIntensity:.9,roughness:.25,metalness:.1,flatShading:true,transparent:true,opacity:.92});
+  boltGeo=new THREE.SphereGeometry(.09,10,8);boltMat=new THREE.MeshBasicMaterial({color:0xf0e8ff});
+  glowGeo=new THREE.SphereGeometry(.22,12,10);glowMat=new THREE.MeshBasicMaterial({color:0x8f6be0,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false});
+  waveGeo=new THREE.RingGeometry(.32,.62,16,1,-.95,1.9);waveGeo.rotateX(-Math.PI/2);
+  waveMat=new THREE.MeshBasicMaterial({color:0xfff3b0,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+  ray=new THREE.Raycaster();floorPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+}
+function debMat(c){return debMats[c]||(debMats[c]=new THREE.MeshLambertMaterial({color:c}))}
+function sprTex(name){return TC[name]||(TC[name]=tex(SPR[name]))}
+function makeSprite(name,h){
+  const mat=new THREE.MeshLambertMaterial({map:sprTex(name),transparent:true,alphaTest:.5,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(planeGeo,mat);mesh.scale.set(h,h,1);
+  const blob=new THREE.Mesh(blobGeo,blobMat);blob.scale.setScalar(h*.75);blob.position.y=.012;
+  return{mesh,blob,mat,h};
+}
+function dropSprite(s){if(s.mesh.parent)s.mesh.parent.remove(s.mesh);if(s.blob.parent)s.blob.parent.remove(s.blob);s.mat.dispose()}
+
+/* ---------- state ---------- */
+let map,ore,dmg,mhp,blk,P=null,mons=[],items=[],shots=[],parts=[],floats=[],fxs=[],timers=[],pending=[],depth=1,kills=0,broken=0,paused=true,over=false,shake=0,spawnT=0,lastTile=-1,flow,best=0,hardT=0,stairLock=false,inRun=false;
+let playerSpr=null;
+try{best=+localStorage.getItem('deepvein25-best')||0}catch(e){}
+
+function newGame(cls,quiet){
+  const C=CLASSES[cls];
+  P={cls,x:0,z:0,r:.3,kx:0,kz:0,hp:C.hp,max:C.hp,atk:C.atk,mine:C.mine,spd:C.spd,armor:0,potions:1,light:0,
+     aspd:1,area:1,cdr:1,crit:cls==='rogue'?.15:0,leech:0,thorns:0,luck:0,quake:0,twin:0,exec:false,motherlode:false,wave:false,chain:false,split:false,poison:false,blast:1,
+     mlv:1,mxp:0,atkT:0,skT:0,inv:0,face:{x:0,z:1},swing:0,swingAng:0,spin:0,dash:0,dashAng:0,dashHit:null,moving:false,deck:{}};
+  depth=1;kills=0;broken=0;over=false;inRun=!quiet;$('#log').innerHTML='';
+  gen();applyLang();
+  if(!quiet){paused=false;log(ja()?`${C.n}としてダンジョンに降り立った。鉱石を掘って採掘レベルを上げよう。`:`You enter the dungeon as a ${C.n}. Mine ore to raise your mining level.`,'var(--lamp)')}
+}
+function pickTier(){const w=[Math.max(14,62-depth*6),22+depth*2,8+depth*2.5,3+depth*1.6];if(P.motherlode){w[2]+=18;w[3]+=14}
+  let r=Math.random()*(w[0]+w[1]+w[2]+w[3]);for(let k=0;k<4;k++){if(r<w[k])return k;r-=w[k]}return 0}
+
+function gen(){
+  if(levelG){for(const m of mons)m.spr.mat.dispose();for(const it of items)it.spr.mat.dispose();scene.remove(levelG)}
+  for(const p of [...shots])killShot(p);
+  levelG=new THREE.Group();scene.add(levelG);
+  map=new Uint8Array(W*H);ore=new Uint8Array(W*H);dmg=new Float32Array(W*H);mhp=new Float32Array(W*H);blk={};flow=new Int16Array(W*H);
+  mons=[];items=[];shots=[];floats=[];timers=[];pending=[];lastTile=-1;spawnT=12;stairLock=false;
+  for(const p of parts)scene.remove(p.mesh);parts=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)map[I(x,y)]=(x===0||y===0||x===W-1||y===H-1)?WALL:F;
+  for(let k=0;k<11;k++){const x=2+R(W-6),y=2+R(H-6);
+    if(Math.random()<.5){const sz=1+R(2);for(let j=0;j<sz;j++)for(let i=0;i<sz;i++)map[I(x+i,y+j)]=WALL}
+    else{const hz=Math.random()<.5,len=4+R(6);for(let s=0;s<len;s++){const xx=hz?x+s:x,yy=hz?y:y+s;if(xx<W-1&&yy<H-1&&Math.random()<.85)map[I(xx,yy)]=WALL}}}
+  const floors=[];for(let i=0;i<W*H;i++)if(map[i]===F)floors.push(i);
+  const s=floors[R(floors.length)];P.x=s%W+.5;P.z=((s/W)|0)+.5;
+  const dist=new Int32Array(W*H).fill(-1);dist[s]=0;const q=[s];
+  for(let h=0;h<q.length;h++){const c=q[h],x=c%W,y=(c/W)|0;for(const[dx,dy]of DIRS){const j=I(x+dx,y+dy);if(map[j]!==WALL&&dist[j]<0){dist[j]=dist[c]+1;q.push(j)}}}
+  for(let i=0;i<W*H;i++)if(map[i]===F&&dist[i]<0)map[i]=WALL;
+  const stair=q[q.length-1];map[stair]=STAIR;
+  const open=q.filter(i=>map[i]===F&&dist[i]>2),take=()=>open.splice(R(open.length),1)[0];
+  for(let k=0;k<11+Math.min(6,depth)&&open.length;k++){let i=take();const cl=Math.random()<.4?2+R(2):1,tier=pickTier();
+    for(let c=0;c<cl;c++){map[i]=NODE;ore[i]=tier;mhp[i]=ORE[tier].hp+depth*(2+tier);
+      const[dx,dy]=DIRS[R(4)],j=I(i%W+dx,((i/W)|0)+dy),oi=open.indexOf(j);if(map[j]!==F||oi<0)break;open.splice(oi,1);i=j}}
+  // floor
+  const fl=new THREE.Mesh(new THREE.PlaneGeometry(W,H),matFloor);fl.rotation.x=-Math.PI/2;fl.position.set(W/2,0,H/2);fl.receiveShadow=true;levelG.add(fl);
+  // walls (instanced, only those touching open space)
+  const walls=[];for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(map[I(x,y)]===WALL){let near=false;for(let j=-1;j<=1;j++)for(let i=-1;i<=1;i++)if(T(x+i,y+j)!==WALL)near=true;if(near)walls.push([x,y])}
+  const im=new THREE.InstancedMesh(boxGeo,matWall,walls.length),m4=new THREE.Matrix4();
+  walls.forEach(([x,y],k)=>{const hgt=1.05+((x*7+y*13)%5)*.04;m4.makeScale(1,hgt,1);m4.setPosition(x+.5,hgt/2,y+.5);im.setMatrixAt(k,m4)});
+  im.castShadow=im.receiveShadow=true;levelG.add(im);
+  // ore blocks
+  let ci=0;crysL.forEach(l=>l.intensity=0);
+  for(let i=0;i<W*H;i++)if(map[i]===NODE){const x=i%W+.5,z=((i/W)|0)+.5,t=ore[i];let g;
+    if(t<3){g=new THREE.Mesh(boxGeo,matOre[t]);g.scale.setScalar(.8);g.position.set(x,.4,z);g.rotation.y=rnd(-.25,.25)}
+    else{g=new THREE.Group();for(let k=0;k<4;k++){const c=new THREE.Mesh(new THREE.OctahedronGeometry(.22+Math.random()*.12,0),matCrys);c.scale.y=2.2;c.position.set(rnd(-.18,.18),.35,rnd(-.18,.18));c.rotation.set(rnd(-.4,.4),rnd(0,3),rnd(-.4,.4));c.castShadow=true;g.add(c)}
+      g.position.set(x,0,z);if(ci<crysL.length){const l=crysL[ci++];l.position.set(x,.8,z);l.intensity=1.2;g.userData.light=l}}
+    g.castShadow=true;g.receiveShadow=true;g.userData.base={x,z};levelG.add(g);blk[i]=g}
+  // stairs
+  const sx=stair%W+.5,sz=((stair/W)|0)+.5;
+  const hole=new THREE.Mesh(new THREE.CircleGeometry(.42,24),new THREE.MeshBasicMaterial({color:0x000000}));hole.rotation.x=-Math.PI/2;hole.position.set(sx,.015,sz);levelG.add(hole);
+  const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.5,24),new THREE.MeshBasicMaterial({color:0xe0a83a}));ring.rotation.x=-Math.PI/2;ring.position.set(sx,.02,sz);levelG.add(ring);
+  const sl=new THREE.PointLight(0xe0a83a,.6,3,2);sl.position.set(sx,.6,sz);levelG.add(sl);
+  // player sprite follows the class
+  if(!playerSpr||playerSpr.cls!==P.cls){if(playerSpr)dropSprite(playerSpr);playerSpr=makeSprite(P.cls,1);playerSpr.cls=P.cls;scene.add(playerSpr.mesh,playerSpr.blob)}
+  const spots=open.filter(i=>dist[i]>8);
+  for(let k=0;k<5+depth*2&&spots.length;k++)spawnMon(spots.splice(R(spots.length),1)[0]);
+  for(let k=0;k<1+R(2)&&spots.length;k++){const i=spots.splice(R(spots.length),1)[0];addPotion(i%W+.5,((i/W)|0)+.5)}
+  calcFlow();hud();
+}
+function monPool(){const p=['slime','bat','slime','bat'];if(depth>=2)p.push('goblin','goblin');if(depth>=3)p.push('brute');if(depth>=5)p.push('goblin','brute');return p}
+function spawnMon(i,ty){const pool=monPool();ty=ty||pool[R(pool.length)];const t=MT[ty],hp=Math.round(t.hp*(1+.22*(depth-1)));
+  const spr=makeSprite(ty,t.h);levelG.add(spr.mesh,spr.blob);
+  mons.push({ty,...t,x:i%W+.5,z:((i/W)|0)+.5,hp,max:hp,atk:t.atk+Math.floor((depth-1)/2),awake:false,kx:0,kz:0,flash:0,frz:0,pois:0,pt:0,st:'walk',stT:0,hop:Math.random(),hvx:0,hvz:0,wob:Math.random()*9,face:1,spr})}
+function addPotion(x,z){const spr=makeSprite('potion',.55);levelG.add(spr.mesh,spr.blob);items.push({x,z,spr})}
+
+/* ---------- helpers ---------- */
+function clear(ax,az,bx,bz){const dx=bx-ax,dz=bz-az,n=Math.ceil(Math.max(Math.abs(dx),Math.abs(dz))*2);for(let s=1;s<n;s++)if(T(ax+dx*s/n,az+dz*s/n)===WALL)return false;return true}
+function calcFlow(){flow.fill(-1);const s=I(Math.floor(P.x),Math.floor(P.z));flow[s]=0;const q=[s];
+  for(let h=0;h<q.length;h++){const c=q[h],x=c%W,y=(c/W)|0;for(const[dx,dy]of DIRS){const j=I(x+dx,y+dy);if(!blocksMove(map[j])&&flow[j]<0){flow[j]=flow[c]+1;q.push(j)}}}}
+function hits(x,z,r){return blocksMove(T(x-r,z-r))||blocksMove(T(x+r,z-r))||blocksMove(T(x-r,z+r))||blocksMove(T(x+r,z+r))}
+function moveEnt(e,dx,dz){if(!hits(e.x+dx,e.z,e.r))e.x+=dx;else e.kx=0;if(!hits(e.x,e.z+dz,e.r))e.z+=dz;else e.kz=0}
+function log(msg,color){const el=document.createElement('div');el.textContent=msg;if(color)el.style.color=color;const L=$('#log');L.prepend(el);[...L.children].forEach((c,k)=>{c.style.opacity=Math.max(.25,1-k*.25);if(k>2)c.remove()})}
+function float(x,y,z,t,c,big){floats.push({x,y,z,t,c,life:1,big})}
+function later(t,fn){timers.push({t,fn})}
+function debris(x,y,z,col,n,sp=1){
+  for(let k=0;k<n;k++){const m=new THREE.Mesh(debGeo,debMat(col));m.position.set(x,y,z);m.castShadow=k%3===0;scene.add(m);
+    parts.push({mesh:m,vx:rnd(-2.5,2.5)*sp,vy:rnd(2,5.5)*sp,vz:rnd(-2.5,2.5)*sp,life:rnd(.8,1.6),spin:rnd(-12,12)})}
+  while(parts.length>320){const p=parts.shift();scene.remove(p.mesh)}
+}
+function hud(){if(!P)return;
+  $('#hpbar').style.width=Math.max(0,P.hp/P.max*100)+'%';$('#hpt').textContent=Math.max(0,Math.ceil(P.hp))+'/'+P.max;
+  $('#sd').textContent=fmtFloor(depth);$('#sml').textContent=P.mlv;$('#xpf').style.width=Math.min(100,P.mxp/xpNeed(P.mlv)*100)+'%';
+  $('#sk').textContent=P.atk;$('#sm').textContent=P.mine;$('#sa').textContent=P.armor;$('#sq').textContent=P.potions;
+  $('#potBtn').disabled=!P.potions||over||!inRun;$('#rsBtn').disabled=!inRun}
+function renderDeck(){if(!P)return;$('#deck').innerHTML=Object.entries(P.deck).map(([id,n])=>{const c=CARDS.find(c=>c.id===id);return `<span class="chip" style="--rc:${RC[c.r]}" title="${c.d}">${c.n}${n>1?` <em>×${n}</em>`:''}</span>`}).join('')}
+
+/* ---------- combat & mining ---------- */
+function dmgMon(m,d,col,sx,sz,kb=3){
+  if(!mons.includes(m))return;m.hp-=d;m.flash=.1;m.awake=true;
+  if(sx!==undefined){const a=Math.atan2(m.z-sz,m.x-sx),k=kb/(m.ty==='brute'?3:1);m.kx+=Math.cos(a)*k;m.kz+=Math.sin(a)*k}
+  float(m.x,m.h*.9,m.z,String(d),col);debris(m.x,.5,m.z,'#d0554f',4,.6);
+  if(m.hp<=0){mons.splice(mons.indexOf(m),1);kills++;dropSprite(m.spr);debris(m.x,.5,m.z,'#d0554f',12,.9);
+    if(m.ty==='brute')log(ja()?`${MT[m.ty].n}を倒した!`:`You slew the ${MT[m.ty].n}!`,'#9fbf5a');
+    if(P.leech&&P.hp<P.max){const h=Math.min(P.leech,P.max-P.hp);P.hp+=h;float(P.x,1.2,P.z,'+'+h,'#9fbf5a')}
+    if(Math.random()<.12)addPotion(m.x,m.z)}
+}
+function hitMon(m,base,sx,sz,kb){let d=base,col='#fff';if(Math.random()<P.crit){d*=2;col='#ffd166'}d=Math.max(1,Math.round(d));
+  if(P.exec&&m.hp-d>0&&(m.hp-d)/m.max<.25){d=m.hp;col='#d58cf0'}if(P.poison)m.pois=3;dmgMon(m,d,col,sx,sz,kb)}
+function hitBlock(i,amt){
+  if(!isBlock(map[i]))return;const x=i%W+.5,z=((i/W)|0)+.5,O=ORE[ore[i]];
+  if(P.mlv<O.req){amt*=.25;if(performance.now()-hardT>900){hardT=performance.now();float(x,1.1,z,ja()?`かたい! Lv${O.req}`:`Too hard! Lv${O.req}`,'#ff8a7a')}}
+  dmg[i]+=amt;blk[i].userData.shk=.15;debris(x,.6,z,O.c,4,.7);debris(x,.6,z,'#6e6b71',3,.6);shake=Math.max(shake,.06);
+  if(dmg[i]>=mhp[i])breakBlock(i);
+}
+function breakBlock(i){
+  const x=i%W+.5,z=((i/W)|0)+.5,tier=ore[i],O=ORE[tier];
+  map[i]=F;dmg[i]=0;broken++;const g=blk[i];if(g.userData.light)g.userData.light.intensity=0;levelG.remove(g);delete blk[i];
+  debris(x,.4,z,O.c,18+tier*8,1.1);debris(x,.4,z,O.hi,6+tier*4,1.3);debris(x,.4,z,'#5d5a5f',10,1);
+  flash.position.set(x,1,z);flash.color.set(O.c);flash.intensity=Math.max(flash.intensity,1+tier*.6);shake=Math.max(shake,.12+tier*.04);calcFlow();
+  log(ja()?`${O.n}を掘り出した。`:`You dug out ${O.n}.`,O.c);
+  gainXP(O.xp*(P.cls==='miner'?1.5:1),x,z,tier);
+  if(P.quake){fxs.push(ringFx(x,z,2,'#ffb35a'));for(const m of [...mons])if(Math.hypot(m.x-x,m.z-z)<=2.2)dmgMon(m,P.quake,'#ffb35a',x,z,4)}
+  if(P.chain)later(.18,()=>explode(x,z,1.7,P.atk*2,P.mine*1.5));
+}
+function gainXP(n,x,z,tier){
+  P.mxp+=n;let up=false;
+  while(P.mxp>=xpNeed(P.mlv)){P.mxp-=xpNeed(P.mlv);P.mlv++;P.mine++;up=true;pending.push({tier,lv:P.mlv})}
+  float(x,.9,z,'+'+Math.round(n)+' XP','#b9e07a');
+  if(up){float(P.x,1.5,P.z,ja()?`採掘Lv${P.mlv}!`:`Mining Lv${P.mlv}!`,'#b9e07a',true);debris(P.x,.3,P.z,'#b9e07a',22,1);fxs.push(ringFx(P.x,P.z,1.4,'#b9e07a'))}
+  hud();
+}
+function ringFx(x,z,r,col){const m=new THREE.Mesh(new THREE.RingGeometry(.8,1,40),new THREE.MeshBasicMaterial({color:col,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
+  m.rotation.x=-Math.PI/2;m.position.set(x,.05,z);scene.add(m);return{mesh:m,t:0,life:.4,r}}
+function slashFx(x,z,ang,range,arc,col){
+  const g=new THREE.RingGeometry(range*.45,range,24,1,-ang-arc/2,arc);const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2;m.position.set(x,.08,z);scene.add(m);fxs.push({mesh:m,t:0,life:.16,slash:true});
+}
+function explode(x,z,r,d,mine,col='#ffa050'){
+  fxs.push(ringFx(x,z,r,'#ffb35a'));flash.position.set(x,1.2,z);flash.color.set(col);flash.intensity=5;shake=Math.max(shake,.3);
+  debris(x,.3,z,'#ffb35a',20,1.4);debris(x,.3,z,'#5d5a5f',14,1.2);
+  for(const m of [...mons])if(Math.hypot(m.x-x,m.z-z)<=r+m.r)hitMon(m,d,x,z,6);
+  for(let tz=Math.floor(z-r);tz<=z+r;tz++)for(let tx=Math.floor(x-r);tx<=x+r;tx++){if(tx<1||tz<1||tx>=W-1||tz>=H-1)continue;if(Math.hypot(tx+.5-x,tz+.5-z)<=r+.3)hitBlock(I(tx,tz),mine)}
+}
+function melee(x,z,ang,range,arc,d,mine,col){
+  slashFx(x,z,ang,range,arc,col);
+  for(const m of [...mons]){const dd=Math.hypot(m.x-x,m.z-z);if(dd<range+m.r&&(dd<.45||adiff(Math.atan2(m.z-z,m.x-x),ang)<=arc/2+.25))hitMon(m,d,x,z)}
+  const tiles=new Set(),n=Math.max(3,Math.round(arc*4));
+  for(let k=0;k<=n;k++){const a=ang-arc/2+arc*k/n;for(let rr=.4;rr<=range+.05;rr+=.25){const tx=Math.floor(x+Math.cos(a)*rr),tz=Math.floor(z+Math.sin(a)*rr),t=T(tx,tz);if(t===WALL)break;if(isBlock(t)){tiles.add(I(tx,tz));break}}}
+  tiles.forEach(i=>hitBlock(i,mine));
+}
+function spawnBolt(a){const g=new THREE.Group();g.add(new THREE.Mesh(boltGeo,boltMat),new THREE.Mesh(glowGeo,glowMat));scene.add(g);
+  shots.push({k:'bolt',x:P.x+Math.cos(a)*.3,z:P.z+Math.sin(a)*.3,y:.55,vx:Math.cos(a)*11,vz:Math.sin(a)*11,life:1.1,d:P.atk,mine:P.mine,pierce:0,hit:new Set(),obj:g})}
+function spawnWave(a){const m=new THREE.Mesh(waveGeo,waveMat);m.rotation.y=-a;scene.add(m);
+  shots.push({k:'wave',x:P.x,z:P.z,y:.3,vx:Math.cos(a)*9,vz:Math.sin(a)*9,life:.5,d:Math.ceil(P.atk*.7),mine:P.mine/2,pierce:99,hit:new Set(),obj:m})}
+function killShot(p){const i=shots.indexOf(p);if(i>=0)shots.splice(i,1);if(p.obj)scene.remove(p.obj);if(p.spr)dropSprite(p.spr)}
+function doAttack(ang){
+  const C=CLASSES[P.cls];P.swing=.16;P.swingAng=ang;
+  if(C.type==='bolt'){for(const a of P.split?[ang-.28,ang,ang+.28]:[ang])spawnBolt(a)}
+  else{melee(P.x,P.z,ang,C.range*P.area,Math.min(Math.PI*1.4,C.arc*(1+(P.area-1)*.6)),P.atk,P.mine,C.wc);if(P.wave)spawnWave(ang)}
+}
+function attack(ang){if(P.atkT>0||P.dash>0)return;P.atkT=CLASSES[P.cls].cd/P.aspd;doAttack(ang);if(Math.random()<P.twin)later(.1,()=>doAttack(ang))}
+function skill(ang){
+  if(P.skT>0||over||P.dash>0)return;const C=CLASSES[P.cls];P.skT=C.skcd*P.cdr;
+  if(P.cls==='warrior'){melee(P.x,P.z,ang,1.9*P.area,Math.PI*2,P.atk*2,P.mine*2,'#fff3b0');shake=Math.max(shake,.2);P.spin=.3}
+  else if(P.cls==='miner'){const spr=makeSprite('bomb',.5);scene.add(spr.mesh,spr.blob);const dist=3.4;
+    shots.push({k:'bomb',x:P.x,z:P.z,y:0,sx:P.x,sz:P.z,tx:P.x+Math.cos(ang)*dist,tz:P.z+Math.sin(ang)*dist,t:0,dur:.65,spr})}
+  else if(P.cls==='mage'){fxs.push(ringFx(P.x,P.z,3.5,'#6fdcea'));flash.position.set(P.x,1.2,P.z);flash.color.set('#6fdcea');flash.intensity=4;
+    debris(P.x,.4,P.z,'#c6f6fa',26,1.5);
+    for(const m of [...mons])if(Math.hypot(m.x-P.x,m.z-P.z)<=3.5+m.r){m.frz=2.5;hitMon(m,P.atk,P.x,P.z,5)}
+    for(let tz=Math.floor(P.z-3);tz<=P.z+3;tz++)for(let tx=Math.floor(P.x-3);tx<=P.x+3;tx++)if(Math.hypot(tx+.5-P.x,tz+.5-P.z)<=3)hitBlock(I(tx,tz),P.mine)}
+  else{P.dash=.17;P.dashAng=ang;P.inv=Math.max(P.inv,.4);P.dashHit=new Set()}
+}
+function autoAim(){
+  const C=CLASSES[P.cls],reach=C.type==='bolt'?7:C.range*P.area+1.3;let best=null,bd=reach;
+  for(const m of mons){const d=Math.hypot(m.x-P.x,m.z-P.z);if(d<bd&&clear(P.x,P.z,m.x,m.z)){bd=d;best=m}}
+  return best?Math.atan2(best.z-P.z,best.x-P.x):Math.atan2(P.face.z,P.face.x)}
+function hurtPlayer(d,src){if(P.inv>0||over)return;d=Math.max(1,d-P.armor);P.hp-=d;P.inv=CLASSES[P.cls].inv;shake=Math.max(shake,.25);
+  float(P.x,1.3,P.z,'-'+d,'#ff6b5e',true);debris(P.x,.6,P.z,'#d0554f',8,.8);
+  const a=Math.atan2(P.z-src.z,P.x-src.x);P.kx+=Math.cos(a)*6;P.kz+=Math.sin(a)*6;
+  if(P.thorns)dmgMon(src,P.thorns,'#9fbf5a',P.x,P.z,3);
+  if(P.hp<=0)die(src);hud()}
+function drink(){if(over||paused||!P||!P.potions)return;P.potions--;const h=Math.min(P.max-P.hp,Math.ceil(P.max*.4));P.hp+=h;float(P.x,1.3,P.z,'+'+h,'#ffb3a8',true);
+  debris(P.x,.4,P.z,'#ffb3a8',10,.7);log(ja()?`回復薬を飲んだ。HP+${h}`:`You drink a potion. +${h} HP`,'#ffb3a8');hud()}
+
+/* ---------- update ---------- */
+const keys={},mouse={sx:0,sy:0,down:false,on:false};let touchAtk=false,joy={x:0,y:0},skillQ=null;
+function aimFromMouse(){const r=glc.getBoundingClientRect();ray.setFromCamera({x:mouse.sx/r.width*2-1,y:-(mouse.sy/r.height)*2+1},camera);const v=new THREE.Vector3();
+  return ray.ray.intersectPlane(floorPlane,v)?Math.atan2(v.z-P.z,v.x-P.x):autoAim()}
+function update(dt){
+  for(const t of [...timers]){t.t-=dt;if(t.t<=0){timers.splice(timers.indexOf(t),1);t.fn()}}
+  let ix=(keys.d||keys.arrowright?1:0)-(keys.a||keys.arrowleft?1:0)+joy.x,iz=(keys.s||keys.arrowdown?1:0)-(keys.w||keys.arrowup?1:0)+joy.y;
+  const il=Math.hypot(ix,iz);if(il>1){ix/=il;iz/=il}if(il>.2)P.face={x:ix/il,z:iz/il};P.moving=il>.2;
+  P.atkT-=dt;P.skT-=dt;P.inv-=dt;P.swing-=dt;if(P.spin>0)P.spin-=dt;
+  if(P.dash>0){P.dash-=dt;
+    for(let s=0;s<4;s++){moveEnt(P,Math.cos(P.dashAng)*24*dt/4,Math.sin(P.dashAng)*24*dt/4);
+      for(const m of [...mons])if(!P.dashHit.has(m)&&Math.hypot(m.x-P.x,m.z-P.z)<.8+m.r){P.dashHit.add(m);hitMon(m,P.atk*1.5,P.x,P.z,4)}}
+    debris(P.x,.5,P.z,'#2f5a45',2,.25)}
+  else moveEnt(P,(ix*P.spd+P.kx)*dt,(iz*P.spd+P.kz)*dt);
+  const kd=Math.pow(.0005,dt);P.kx*=kd;P.kz*=kd;
+  if(mouse.down)attack(aimFromMouse());else if(keys.j||keys[' ']||touchAtk)attack(autoAim());
+  if(skillQ!==null){const a=skillQ==='mouse'?aimFromMouse():autoAim();skillQ=null;skill(a)}
+  const tile=I(Math.floor(P.x),Math.floor(P.z));if(tile!==lastTile){lastTile=tile;calcFlow();if(map[tile]!==STAIR)stairLock=false}
+  for(const it of [...items])if(Math.hypot(it.x-P.x,it.z-P.z)<.6){items.splice(items.indexOf(it),1);dropSprite(it.spr);P.potions++;log(ja()?'赤い回復薬を拾った。':'Picked up a red potion.','#ffb3a8');hud()}
+  // shots
+  for(const p of [...shots]){
+    if(!shots.includes(p))continue;
+    if(p.k==='bomb'){p.t+=dt;const k=Math.min(1,p.t/p.dur),nx=p.sx+(p.tx-p.sx)*k,nz=p.sz+(p.tz-p.sz)*k;
+      if(!blocksMove(T(nx,nz))){p.x=nx;p.z=nz}p.y=Math.sin(k*Math.PI)*1.3;
+      if(k>=1){killShot(p);explode(p.x,p.z,1.9*P.blast,P.atk*3,P.mine*3)}continue}
+    p.life-=dt;let dead=p.life<=0;
+    for(let s=0;s<3&&!dead;s++){const nx=p.x+p.vx*dt/3,nz=p.z+p.vz*dt/3,t=T(nx,nz);
+      if(t===WALL||isBlock(t)){if(isBlock(t))hitBlock(I(Math.floor(nx),Math.floor(nz)),p.mine);else debris(p.x,p.y,p.z,p.k==='bolt'?'#8f6be0':'#fff3b0',4,.5);dead=true;break}
+      p.x=nx;p.z=nz;
+      for(const m of [...mons])if(!p.hit.has(m)&&Math.hypot(m.x-p.x,m.z-p.z)<m.r+.2){p.hit.add(m);hitMon(m,p.d,p.x-p.vx*.05,p.z-p.vz*.05,3);if(--p.pierce<0){dead=true;break}}}
+    p.obj.position.set(p.x,p.y,p.z);
+    if(dead)killShot(p)}
+  updateMons(dt);
+  spawnT-=dt;if(spawnT<=0){spawnT=Math.max(7,17-depth);if(mons.length<9+depth*3){const c=[];for(let i=0;i<W*H;i++)if(map[i]===F&&flow[i]>10)c.push(i);if(c.length)spawnMon(c[R(c.length)])}}
+  if(!over&&!paused&&pending.length)openPick(pending.shift());
+  else if(!over&&!paused&&map[tile]===STAIR&&!stairLock)openStairs();
+  $('#skBtn').style.setProperty('--cd',Math.max(0,P.skT/(CLASSES[P.cls].skcd*P.cdr)));
+}
+function steer(m){const dx=P.x-m.x,dz=P.z-m.z,d=Math.hypot(dx,dz)||1e-6;
+  if(d<1.6||(d<5&&clear(m.x,m.z,P.x,P.z)))return{x:dx/d,z:dz/d};
+  const tx=Math.floor(m.x),tz=Math.floor(m.z),cur=flow[I(tx,tz)];let bx=null,bz=null,bv=cur<0?1e9:cur;
+  for(const[ax,az]of DIRS){const v=flow[I(tx+ax,tz+az)];if(v>=0&&v<bv){bv=v;bx=tx+ax+.5;bz=tz+az+.5}}
+  if(bx===null)return{x:dx/d,z:dz/d};const ex=bx-m.x,ez=bz-m.z,el=Math.hypot(ex,ez)||1;return{x:ex/el,z:ez/el}}
+function updateMons(dt){
+  for(const m of [...mons]){if(!mons.includes(m))continue;m.flash-=dt;m.frz-=dt;
+    if(m.pois>0){m.pois-=dt;m.pt+=dt;if(m.pt>=.5){m.pt=0;dmgMon(m,1+Math.floor(depth/2),'#9fbf5a');if(!mons.includes(m))continue}}
+    const dx=P.x-m.x,dz=P.z-m.z,d=Math.hypot(dx,dz);
+    if(!m.awake&&d<m.sight&&clear(m.x,m.z,P.x,P.z)){m.awake=true;float(m.x,m.h+.2,m.z,'!','#ffd166',true)}
+    if(m.awake&&d>m.sight*2.5)m.awake=false;
+    const slow=m.frz>0?.3:1;let vx=0,vz=0;
+    if(m.awake&&!over){const s=steer(m);
+      if(m.ai==='hop'){m.hop-=dt;if(m.hop<=0){m.hop=rnd(.9,1.3);m.hvx=s.x*4.6;m.hvz=s.z*4.6}m.hvx*=Math.pow(.02,dt);m.hvz*=Math.pow(.02,dt);vx=m.hvx;vz=m.hvz}
+      else if(m.ai==='bat'){m.wob+=dt*7;vx=(s.x-s.z*Math.sin(m.wob)*.9)*m.spd;vz=(s.z+s.x*Math.sin(m.wob)*.9)*m.spd}
+      else if(m.ai==='brute'){m.stT-=dt;
+        if(m.st==='walk'){vx=s.x*m.spd;vz=s.z*m.spd;if(d<4.5&&clear(m.x,m.z,P.x,P.z)&&m.stT<=0){m.st='wind';m.stT=.6;m.ca=Math.atan2(dz,dx)}}
+        else if(m.st==='wind'){if(m.stT<=0){m.st='charge';m.stT=.5}}
+        else if(m.st==='charge'){vx=Math.cos(m.ca)*7.5;vz=Math.sin(m.ca)*7.5;if(Math.random()<.4)debris(m.x,.1,m.z,'#5d5a5f',1,.3);if(m.stT<=0){m.st='rest';m.stT=.9}}
+        else if(m.st==='rest'&&m.stT<=0){m.st='walk';m.stT=1}}
+      else{vx=s.x*m.spd;vz=s.z*m.spd}}
+    else{if(Math.random()<dt*.6){const a=Math.random()*6.28;m.hvx=Math.cos(a)*.7;m.hvz=Math.sin(a)*.7}vx=m.hvx;vz=m.hvz}
+    if(Math.abs(vx)>.05)m.face=vx>0?1:-1;
+    moveEnt(m,(vx*slow+m.kx)*dt,(vz*slow+m.kz)*dt);const kd=Math.pow(.003,dt);m.kx*=kd;m.kz*=kd;
+    for(const o of mons){if(o===m)continue;const ox=m.x-o.x,oz=m.z-o.z,od=Math.hypot(ox,oz),mn=m.r+o.r;if(od>0&&od<mn){const p=(mn-od)/2;moveEnt(m,ox/od*p,oz/od*p)}}
+    if(!over&&P.dash<=0&&Math.hypot(P.x-m.x,P.z-m.z)<P.r+m.r)hurtPlayer(m.atk,m);
+  }
+}
+
+/* ---------- overlays ---------- */
+let choose=null,ovRender=null,cancelRs=null;
+function closeOv(){ov.innerHTML='';choose=null;ovRender=null;cancelRs=null}
+function sprURL(s){const c=document.createElement('canvas');c.width=c.height=8;c.getContext('2d').drawImage(s,0,0);return c.toDataURL()}
+function classSelect(){
+  paused=true;inRun=false;mouse.down=false;touchAtk=false;const maxv={hp:30,atk:4,mine:5,spd:5.6};
+  ovRender=()=>{
+    ov.innerHTML=`<div class="overlay"><div class="pick">
+      <div class="logo">${UI[lang].brand}<small>2.5D</small></div><p>${ja()?'職業を選んでダンジョンへ。鉱石を掘ってレベルを上げ、カードを集めて、どこまで深く潜れるか。':'Pick a class and head down. Mine ore to level up, collect cards, and see how deep you can go.'}</p>
+      <div class="cls">${CLS_IDS.map((id,k)=>{const c=CLASSES[id];return `<button class="clsbtn" data-k="${k}">
+        <img src="${sprURL(SPR[id])}" alt="">
+        <span class="nm">${c.n}<small>${k+1}</small></span><span class="ds">${c.d}</span>
+        <span class="st">${[['HP',c.hp,'hp'],[UI[lang].atk,c.atk,'atk'],[UI[lang].mine,c.mine,'mine'],[ja()?'速さ':'Speed',c.spd,'spd']].map(([l,v,key])=>`<span>${l}</span><i><b style="width:${v/maxv[key]*100}%"></b></i>`).join('')}</span>
+        <span class="sk"><b>${ja()?'技:':'Skill: '}${c.sk}</b><br>${c.skd}<br><b>${ja()?'特性':'Trait'}</b> ${c.ps}</span></button>`}).join('')}</div></div></div>`;
+    ov.querySelectorAll('.clsbtn').forEach(b=>b.onclick=()=>choose(+b.dataset.k));ov.querySelector('.clsbtn').focus()};
+  choose=k=>{const id=CLS_IDS[k];if(!id)return;closeOv();newGame(id)};
+  ovRender();applyLang();
+}
+function oddsFor(tier){const w=[...ORE[tier].w],shift=Math.min(.85,P.luck+(P.mlv-1)*.03),amt=w[0]*shift;w[0]-=amt;w[1]+=amt*.6;w[2]+=amt*.4;const t=w[0]+w[1]+w[2];return w.map(v=>v/t)}
+function drawCards(n,tier){const w=oddsFor(tier),pool=CARDS.filter(c=>(!c.cls||c.cls===P.cls)&&!(c.max&&(P.deck[c.id]||0)>=c.max)),hand=[];
+  for(let k=0;k<n&&pool.length;k++){const roll=Math.random(),r=roll<w[0]?0:roll<w[0]+w[1]?1:2;let opts=pool.filter(c=>c.r===r);for(let rr=r;!opts.length&&rr>=0;rr--)opts=pool.filter(c=>c.r===rr);if(!opts.length)opts=pool;
+    if(r===2){const own=opts.filter(c=>c.cls);if(own.length&&Math.random()<.4)opts=own}
+    const c=opts[R(opts.length)];hand.push(c);pool.splice(pool.indexOf(c),1)}return hand}
+function openPick(e){
+  paused=true;mouse.down=false;touchAtk=false;const hand=drawCards(P.cls==='miner'?4:3,e.tier),O=ORE[e.tier],od=oddsFor(e.tier);
+  ovRender=()=>{ov.innerHTML=`<div class="overlay"><div class="pick"><h2 style="color:var(--xp)">${ja()?`採掘Lv${e.lv}! カードを選べ`:`Mining Lv${e.lv}! Choose a card`}</h2>
+    <p>${ja()?`<b style="color:${O.c}">${O.n}</b>でレベルが上がった。良い鉱石ほどレアなカードが出やすい。持っていけるのは1枚だけ。`:`You levelled up on <b style="color:${O.c}">${O.n}</b>. Better ore means rarer cards. Keep one.`}</p>
+    <p class="odds">${[0,1,2].map(r=>`<span style="color:${RC[r]}">${RARS[lang][r]} ${Math.round(od[r]*100)}%</span>`).join('')}</p>
+    <div class="hand" style="--n:${hand.length}">${hand.map((c,k)=>`<button class="cardbtn" data-k="${k}" style="--rc:${RC[c.r]}">
+      <span class="rar"><span>${RARS[lang][c.r]}${c.cls?(ja()?`・${CLASSES[c.cls].n}専用`:` · ${CLASSES[c.cls].n} only`):''}</span><span>${k+1}</span></span><span class="nm">${c.n}</span><span class="ds">${c.d}</span>
+      ${P.deck[c.id]?`<span class="own">${ja()?'所持':'Owned'} ×${P.deck[c.id]}</span>`:''}</button>`).join('')}</div></div></div>`;
+    ov.querySelectorAll('.cardbtn').forEach(b=>b.onclick=()=>choose(+b.dataset.k));const f=ov.querySelector('.cardbtn');if(f)f.focus()};
+  choose=k=>{const c=hand[k];if(!c)return;c.f();if(!c.once)P.deck[c.id]=(P.deck[c.id]||0)+1;closeOv();paused=false;renderDeck();hud();
+    float(P.x,1.4,P.z,c.n,'#fff3b0',true);log(ja()?`「${c.n}」を手に入れた。`:`Took ${c.n}.`,RC[c.r])};
+  ovRender();
+}
+function openStairs(){
+  paused=true;mouse.down=false;touchAtk=false;const left=[...map].filter(isBlock).length;
+  ovRender=()=>{ov.innerHTML=`<div class="overlay"><div class="card"><h2>${ja()?`B${depth+1}Fへの階段`:`Stairs to floor ${depth+1}`}</h2>
+    <p>${ja()?(left?`この階にはまだブロックが${left}個残っている。降りれば、その経験値は手に入らない。`:'この階は掘り尽くした。')+'下の階の敵はもっと強い。'
+      :(left?`${left} block${left>1?'s':''} still unbroken here. That's mining XP you'd leave behind.`:'This floor is mined out.')+' Monsters below hit harder.'}</p>
+    <div class="row"><button id="stay">${ja()?'残って掘る':'Stay and mine'}</button><button id="down">${ja()?'降りる':'Descend'} ▼</button></div></div></div>`;
+    $('#stay').onclick=()=>{closeOv();paused=false;stairLock=true};
+    $('#down').onclick=()=>{closeOv();descend()};$('#down').focus()};
+  ovRender();
+}
+function descend(){paused=true;$('#fade').style.opacity=1;
+  setTimeout(()=>{depth++;P.hp=Math.min(P.max,P.hp+Math.ceil(P.max*.15));gen();log(ja()?`B${depth}F に到着。敵の気配が濃くなった。`:`Floor ${depth}. The air feels more hostile.`,'var(--lamp)');
+    if(depth>best){best=depth;try{localStorage.setItem('deepvein25-best',best)}catch(e){}}$('#fade').style.opacity=0;paused=false},380)}
+function die(m){over=true;hud();log(ja()?`${MT[m.ty].n}にやられた…`:`The ${MT[m.ty].n} got you...`,'var(--blood)');
+  setTimeout(()=>{paused=true;ovRender=()=>{const nc=Object.values(P.deck).reduce((a,b)=>a+b,0),cn=CLASSES[P.cls].n,bd=Math.max(best,depth);
+    ov.innerHTML=`<div class="overlay"><div class="card"><h2>${ja()?`${MT[m.ty].n}にやられた`:`Slain by the ${MT[m.ty].n}`}</h2>
+    <p>${ja()?`${cn}・到達 B${depth}F・採掘Lv${P.mlv}・撃破 ${kills}・カード ${nc}枚<br>最深記録: B${bd}F`:`${cn} · floor ${depth} · Mining Lv${P.mlv} · ${kills} kills · ${nc} cards<br>Deepest run: floor ${bd}`}</p>
+    <div class="row"><button id="same">${ja()?'同じ職業で再挑戦':'Retry same class'}</button><button id="again">${ja()?'職業を選び直す':'Choose a new class'}</button></div></div></div>`;
+    $('#same').onclick=()=>{const c=P.cls;closeOv();newGame(c)};$('#again').onclick=()=>{closeOv();classSelect()};$('#same').focus()};ovRender()},900)}
+function openRestart(){if(!P||!inRun||ovRender||over)return;paused=true;mouse.down=false;touchAtk=false;for(const k in keys)keys[k]=false;cancelRs=()=>{closeOv();paused=false};
+  ovRender=()=>{const nc=Object.values(P.deck).reduce((a,b)=>a+b,0);
+    ov.innerHTML=`<div class="overlay"><div class="card"><h2>${ja()?'リスタートしますか?':'Restart this run?'}</h2>
+    <p>${ja()?`いまの進行(${CLASSES[P.cls].n}・B${depth}F・採掘Lv${P.mlv}・カード${nc}枚)は失われる。`:`Your run (${CLASSES[P.cls].n}, floor ${depth}, Mining Lv${P.mlv}, ${nc} card${nc===1?'':'s'}) will be lost.`}</p>
+    <div class="row"><button id="rsSame">${ja()?'同じ職業で再挑戦':'Same class'}</button><button id="rsNew">${ja()?'職業を選び直す':'New class'}</button></div>
+    <div class="row"><button id="rsNo">${ja()?'続ける':'Keep playing'}</button></div></div></div>`;
+    $('#rsSame').onclick=()=>{const c=P.cls;closeOv();newGame(c)};$('#rsNew').onclick=()=>{closeOv();classSelect()};$('#rsNo').onclick=()=>cancelRs();$('#rsNo').focus()};ovRender()}
+function applyLang(){const u=UI[lang];document.documentElement.lang=lang;
+  $('#tBrand').textContent=u.brand;$('#lFloor').textContent=u.floor;$('#lMlv').textContent=u.mlv;$('#lAtk').textContent=u.atk;$('#lMine').textContent=u.mine;$('#lArm').textContent=u.arm;
+  $('#lPot').textContent=u.pot;$('#rsBtn').textContent=u.rs;$('#langBtn').textContent=u.lang;$('#tA').textContent=u.tA;$('#tS').textContent=u.tS;$('#tQ').textContent=u.tQ;$('#keysHelp').innerHTML=u.keys;
+  $('#deck').dataset.empty=u.empty;
+  $('#clsChip').textContent=inRun?CLASSES[P.cls].n:u.noCls;$('#skName').textContent=inRun?CLASSES[P.cls].sk:u.skill;
+  if(inRun)renderDeck();else $('#deck').innerHTML='';
+  hud();if(ovRender)ovRender()}
+
+/* ---------- render ---------- */
+let last=0,cw=1,ch=1,tmpV,camT;
+function resize(){const r=stage.getBoundingClientRect();cw=r.width;ch=r.height;const dpr=Math.min(2,devicePixelRatio||1);
+  renderer.setPixelRatio(dpr);renderer.setSize(cw,ch,false);camera.aspect=cw/ch;camera.updateProjectionMatrix();fxc.width=Math.round(cw*dpr);fxc.height=Math.round(ch*dpr);fx.setTransform(dpr,0,0,dpr,0,0)}
+function toScreen(x,y,z){tmpV.set(x,y,z).project(camera);return[(tmpV.x+1)/2*cw,(1-tmpV.y)/2*ch,tmpV.z<1]}
+function placeSprite(spr,x,y,z,face,extra=0){spr.mesh.position.set(x,y,z);spr.mesh.quaternion.copy(camera.quaternion);spr.mesh.rotateZ(extra);spr.mesh.scale.x=spr.h*(face<0?-1:1);spr.blob.position.set(x,.012,z)}
+function frame(now){
+  requestAnimationFrame(frame);const dt=Math.min(.04,(now-last)/1000||0);last=now;
+  if(P&&!paused)update(dt);
+  if(!P){renderer.render(scene,camera);return}
+  // the class picker slowly orbits the starting room
+  const idle=!inRun?now/4000:0;
+  camT.lerp(tmpV.set(P.x,0,P.z),Math.min(1,dt*8));if(camT.distanceTo(tmpV.set(P.x,0,P.z))>6)camT.set(P.x,0,P.z);
+  shake*=Math.pow(.004,dt);const sx=(Math.random()-.5)*shake,sz=(Math.random()-.5)*shake;
+  if(inRun)camera.position.set(camT.x+sx,10.2,camT.z+6.4+sz);else camera.position.set(camT.x+Math.sin(idle)*6.4,8.5,camT.z+Math.cos(idle)*6.4);
+  camera.lookAt(camT.x+sx,0,camT.z-(inRun?.2:0)+sz);
+  lamp.position.set(P.x,1.7,P.z);lamp.distance=11+P.light*1.8;lamp.intensity=2.2+Math.sin(now/130)*.08+Math.sin(now/47)*.05;
+  flash.intensity*=Math.pow(.004,dt);
+  crysL.forEach((l,k)=>{if(l.intensity>0)l.intensity=1.1+Math.sin(now/300+k)*.25});
+  // player
+  const fl=(P.swing>0?Math.cos(P.swingAng):P.face.x)<0?-1:1;
+  const bob=P.moving&&!paused?Math.abs(Math.sin(now/90))*.07:0;
+  let tilt=P.swing>0?(P.swing/.16-.5)*.5*-fl:0;if(P.spin>0)tilt=P.spin/.3*Math.PI*2;
+  placeSprite(playerSpr,P.x,bob,P.z,fl,tilt);playerSpr.mesh.visible=!(P.inv>0&&P.dash<=0&&Math.floor(now/70)%2)||over;
+  playerSpr.mat.emissive.setHex(P.dash>0?0x1f4a36:0x000000);
+  for(const m of mons){let y=0;if(m.ai==='bat')y=.45+Math.sin(now/90+m.wob)*.08;
+    let sq=0;if(m.ai==='hop'){sq=Math.min(1,Math.hypot(m.hvx,m.hvz)/4.6);y=Math.sin(sq*Math.PI)*.18}
+    placeSprite(m.spr,m.x+(m.st==='wind'?(Math.random()-.5)*.08:0),y,m.z,m.face);
+    if(m.ai==='hop')m.spr.mesh.scale.y=m.h*(1-sq*.15);
+    m.spr.mat.emissive.setHex(m.flash>0||(m.st==='wind'&&Math.floor(now/70)%2)?0xffffff:m.frz>0?0x1f6a7a:m.pois>0?0x2a4a10:0x000000)}
+  for(const it of items)placeSprite(it.spr,it.x,.05+Math.sin(now/220+it.x)*.05,it.z,1);
+  for(const p of shots)if(p.k==='bomb')placeSprite(p.spr,p.x,p.y,p.z,1,now/80);
+  for(const k in blk){const g=blk[k],u=g.userData;if(u.shk>0){u.shk-=dt;g.position.x=u.base.x+(Math.random()-.5)*.08;g.position.z=u.base.z+(Math.random()-.5)*.08}else{g.position.x=u.base.x;g.position.z=u.base.z}
+    const f=dmg[k]/mhp[k],s0=ore[k]===3?1:.8;g.scale.setScalar(s0*(1-f*.18))}
+  for(const p of parts){if(!paused){p.life-=dt;p.vy-=16*dt;p.mesh.position.x+=p.vx*dt;p.mesh.position.y+=p.vy*dt;p.mesh.position.z+=p.vz*dt;p.mesh.rotation.x+=p.spin*dt;p.mesh.rotation.z+=p.spin*dt*.7;
+    if(p.mesh.position.y<.055){p.mesh.position.y=.055;p.vy*=-.35;p.vx*=.55;p.vz*=.55;p.spin*=.5}if(p.life<.3)p.mesh.scale.setScalar(Math.max(.01,p.life/.3))}}
+  for(const p of parts)if(p.life<=0)scene.remove(p.mesh);parts=parts.filter(p=>p.life>0);
+  for(const f of fxs){f.t+=dt;const k=f.t/f.life;f.mesh.material.opacity=Math.max(0,(f.slash?.8:1)*(1-k));if(!f.slash)f.mesh.scale.setScalar(f.r*(.3+k*.7))}
+  for(const f of fxs)if(f.t>=f.life){scene.remove(f.mesh);f.mesh.geometry.dispose();f.mesh.material.dispose()}fxs=fxs.filter(f=>f.t<f.life);
+  renderer.render(scene,camera);
+  // 2D overlay: block HP, level locks, monster HP, floating text
+  fx.clearRect(0,0,cw,ch);if(!inRun)return;fx.textAlign='center';const font=ja()?'DotGothic16':'"Pixelify Sans"';
+  for(const k in blk){const O=ORE[ore[k]];if(!dmg[k]&&P.mlv>=O.req)continue;const x=k%W+.5,z=((k/W)|0)+.5;if(Math.hypot(x-P.x,z-P.z)>9)continue;const[sx2,sy2,ok]=toScreen(x,1.05,z);if(!ok)continue;
+    if(dmg[k]){fx.fillStyle='#000';fx.fillRect(sx2-18,sy2,36,5);fx.fillStyle=O.c;fx.fillRect(sx2-18,sy2,36*Math.max(0,1-dmg[k]/mhp[k]),5)}
+    if(P.mlv<O.req){fx.font=`13px ${font}, monospace`;fx.fillStyle='#000';fx.fillText('Lv'+O.req,sx2+1,sy2-3);fx.fillStyle='#ff8a7a';fx.fillText('Lv'+O.req,sx2,sy2-4)}}
+  for(const m of mons){if(m.hp>=m.max)continue;const[sx2,sy2,ok]=toScreen(m.x,m.h+.15+(m.ai==='bat'?.45:0),m.z);if(!ok)continue;fx.fillStyle='#000';fx.fillRect(sx2-16,sy2,32,4);fx.fillStyle='#d0554f';fx.fillRect(sx2-16,sy2,32*m.hp/m.max,4)}
+  for(const f of floats){if(!paused){f.life-=dt*1.2;f.y+=dt*.8}const[sx2,sy2,ok]=toScreen(f.x,f.y,f.z);if(!ok)continue;fx.font=`${f.big?20:15}px ${font}, monospace`;fx.globalAlpha=Math.max(0,Math.min(1,f.life*2));
+    fx.fillStyle='#000';fx.fillText(f.t,sx2+1,sy2+1);fx.fillStyle=f.c;fx.fillText(f.t,sx2,sy2)}
+  fx.globalAlpha=1;floats=floats.filter(f=>f.life>0);
+  if(mouse.on&&!paused){fx.strokeStyle='rgba(224,168,58,.7)';fx.lineWidth=2;fx.beginPath();fx.arc(mouse.sx,mouse.sy,7,0,7);fx.stroke()}
+}
+
+/* ---------- input ---------- */
+addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&cancelRs){cancelRs();return}
+  if(choose&&/^[1-4]$/.test(e.key)){choose(+e.key-1);return}
+  const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();
+  if(paused||!P)return;keys[k]=true;
+  if(k==='q')drink();if((k==='k'||k==='shift')&&!e.repeat)skillQ='auto';if(k==='r'&&!e.repeat){keys[k]=false;openRestart()}});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouse.down=false;touchAtk=false});
+glc.addEventListener('contextmenu',e=>e.preventDefault());
+glc.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;const r=glc.getBoundingClientRect();mouse.sx=e.clientX-r.left;mouse.sy=e.clientY-r.top;mouse.on=true});
+glc.addEventListener('pointerleave',()=>{mouse.on=false;mouse.down=false});
+glc.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||paused||!P)return;const r=glc.getBoundingClientRect();mouse.sx=e.clientX-r.left;mouse.sy=e.clientY-r.top;mouse.on=true;
+  if(e.button===2)skillQ='mouse';else if(e.button===0)mouse.down=true});
+addEventListener('pointerup',e=>{if(e.pointerType==='mouse'&&e.button===0)mouse.down=false});
+$('#skBtn').onclick=()=>{if(!paused&&P)skillQ='auto'};$('#potBtn').onclick=drink;$('#rsBtn').onclick=openRestart;
+$('#langBtn').onclick=()=>{lang=ja()?'en':'ja';try{localStorage.setItem('deepvein-lang',lang)}catch(e){}applyLang()};
+const joyEl=$('#joy'),knob=$('#knob');let joyId=null;
+function joyMove(e){const r=joyEl.getBoundingClientRect();let dx=(e.clientX-r.left-r.width/2)/(r.width/2),dy=(e.clientY-r.top-r.height/2)/(r.height/2);const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l}
+  joy={x:Math.abs(dx)<.15?0:dx,y:Math.abs(dy)<.15?0:dy};knob.style.transform=`translate(${dx*35}px,${dy*35}px)`}
+joyEl.addEventListener('pointerdown',e=>{joyId=e.pointerId;joyEl.setPointerCapture(e.pointerId);joyMove(e)});
+joyEl.addEventListener('pointermove',e=>{if(e.pointerId===joyId)joyMove(e)});
+const joyEnd=e=>{if(e.pointerId!==joyId)return;joyId=null;joy={x:0,y:0};knob.style.transform=''};joyEl.addEventListener('pointerup',joyEnd);joyEl.addEventListener('pointercancel',joyEnd);
+const tA=$('#tA');tA.addEventListener('pointerdown',e=>{e.preventDefault();tA.setPointerCapture(e.pointerId);touchAtk=true});['pointerup','pointercancel'].forEach(ev=>tA.addEventListener(ev,()=>touchAtk=false));
+$('#tS').addEventListener('pointerdown',e=>{e.preventDefault();if(!paused&&P)skillQ='auto'});
+$('#tQ').addEventListener('pointerdown',e=>{e.preventDefault();drink()});
+
+/* ---------- boot: a live dungeon sits behind the class picker ---------- */
+try{
+  if(!window.THREE)throw new Error('three');
+  initGL();tmpV=new THREE.Vector3();camT=new THREE.Vector3();
+  new ResizeObserver(resize).observe(stage);resize();
+  newGame('miner',true);classSelect();requestAnimationFrame(frame);
+}catch(err){console.error(err);stage.insertAdjacentHTML('beforeend',`<div id="err">${ja()?'3D表示を開始できなかった。WebGLに対応したブラウザで開いてほしい。':'Couldn’t start the 3D view. This example needs a browser with WebGL.'}</div>`);applyLang()}
+</script>
+
+</body></html>

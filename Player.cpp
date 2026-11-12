@@ -6,8 +6,6 @@
 #include "input.h"
 #include "Collision.h"
 
-#include "Bullet.h"
-
 #include "Manager.h"
 #include "Camera.h"
 #include "audio.h"
@@ -16,7 +14,6 @@
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
-#include "MeshField.h"
 
 void Player::Init()
 {
@@ -106,8 +103,7 @@ void Player::Update()
 
     m_Position += m_Velocity * dt;
 
-    MeshField* meshField = Manager::GetGameObj<MeshField>();
-    float height = meshField->GetHeight(m_Position);
+    const float height = 0.0f;   // flat dungeon floor
 
     if (m_Position.y < height)
     {
@@ -309,7 +305,7 @@ void Player::UpdateAttack()
     SetAnimation("Attack");
     m_StateTime += dt;
     if (m_StateTime > 1.0f)
-        m_StateTime = STATE_GROUND;
+        m_State = STATE_GROUND;
 }
 
 void Player::Draw()

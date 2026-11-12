@@ -8,6 +8,15 @@
 
 enum class Tile : uint8_t { Floor, Wall, Block, Stairs };
 
+// What one mining hit did to a block.
+struct MineResult
+{
+    bool hit = false;       // there was a block on that tile
+    bool tooHard = false;   // mining level below the ore's requirement (25% damage)
+    bool broken = false;    // the block broke this hit
+    int  grade = 0;         // ore grade index into kOre
+};
+
 class TileMap : public GameObject
 {
 public:
@@ -18,6 +27,10 @@ private:
     std::vector<Tile> m_Tiles;          // W * H, index = z * W + x
     std::vector<int>  m_Dist;           // steps from the start tile (-1 = unreachable)
     std::vector<int>  m_VisibleWalls;   // walls that touch open floor (the only ones drawn)
+    std::vector<uint8_t> m_OreGrade;    // valid where the tile is Block
+    std::vector<float>   m_BlockHp;
+    std::vector<float>   m_BlockDamage;
+    int m_BlocksLeft = 0;
 
     uint32_t m_Seed = 0;
     int m_FloorNo = 1;
@@ -38,6 +51,7 @@ private:
 
     void Set(int x, int z, Tile t);
     bool BoxHits(float x, float z, float half) const;
+    void PlaceOre(uint32_t seed, int floorNo);
 
 public:
     void Init() override;
@@ -54,9 +68,17 @@ public:
     // Move on the floor plane one axis at a time so bodies slide along walls.
     void MoveAndSlide(Vector3& pos, Vector3& vel, float dt, float half) const;
 
+    // Tiles hit by a melee swing: rays fanned across the arc, each stopping at the
+    // first wall or block. Writes up to maxOut tile indices (z * W + x), returns the count.
+    int BlocksInArc(float ox, float oz, float facing, float range, float arc, int* out, int maxOut) const;
+
+    // Apply one mining hit to the block on tile (x, z).
+    MineResult MineBlock(int x, int z, float power, int mineLevel);
+
     Vector3 GetStartPosition() const { return Vector3(m_StartX + 0.5f, 0.0f, m_StartZ + 0.5f); }
     uint32_t GetSeed() const { return m_Seed; }
     int GetFloor() const { return m_FloorNo; }
     int GetDrawnWalls() const { return m_DrawnWalls; }
+    int GetBlocksLeft() const { return m_BlocksLeft; }
 };
 

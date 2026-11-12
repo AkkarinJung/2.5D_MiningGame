@@ -8,6 +8,7 @@
 #include "Player.h"
 #include "Fade.h"
 #include "GameObject.h"
+#include "Score.h"
 #include <random>
 
 void Game::Init()
@@ -16,6 +17,10 @@ void Game::Init()
     TileMap* map = Manager::AddGameObj<TileMap>();
     Player* player = Manager::AddGameObj<Player>();
     player->SetPosition(map->GetStartPosition());
+
+    Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
+    level->SetPosition({ 20.0f, 20.0f, 0.0f });
+    level->SetScore(1);
 
     Manager::AddGameObj<Fade>()->Init(false, nullptr);
 }

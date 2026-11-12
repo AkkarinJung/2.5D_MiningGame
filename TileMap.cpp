@@ -8,9 +8,10 @@
 #include "manager.h"
 #include "Camera.h"
 #include "TileMap.h"
+#include "OreData.h"
 #include <random>
 #include <cmath>
-
+#include <algorithm>
 
 namespace
 {
@@ -281,6 +282,132 @@ void TileMap::Generate(uint32_t seed, int floorNo)
         }
 }
 
+// 7. Ore veins on tiles more than 2 steps from the start; rarer grades deeper.
+void TileMap::PlaceOre(uint32_t seed, int floorNo)
+{
+    std::mt19937 rng(seed ^ (uint32_t)(floorNo * 0x85EBCA6Bu) ^ 0x0BE5u);
+    auto randInt = [&](int n) { return std::uniform_int_distribution<int>(0, n - 1)(rng); };
+    auto chance = [&](float p) { return std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < p; };
+
+    m_OreGrade.assign(W * H, 0);
+    m_BlockHp.assign(W * H, 0.0f);
+    m_BlockDamage.assign(W * H, 0.0f);
+    m_BlocksLeft = 0;
+
+    std::vector<int> open;
+    open.reserve(W * H);
+    for (int i = 0; i < W * H; i++)
+        if (m_Tiles[i] == Tile::Floor && m_Dist[i] > 2)
+            open.push_back(i);
+
+    auto takeAt = [&](size_t k) { const int i = open[k]; open[k] = open.back(); open.pop_back(); return i; };
+
+    const float f = (float)floorNo;
+    const float weights[kOreCount] =
+    {
+        std::max(14.0f, 62.0f - 6.0f * f),   // copper
+        22.0f + 2.0f * f,                    // silver
+        8.0f + 2.5f * f,                     // gold
+        3.0f + 1.6f * f,                     // crystal
+    };
+    const float total = weights[0] + weights[1] + weights[2] + weights[3];
+
+    const int veins = 12 + std::min(6, floorNo);
+    for (int v = 0; v < veins && !open.empty(); v++)
+    {
+        // Pick a grade by weight
+        float roll = std::uniform_real_distribution<float>(0.0f, total)(rng);
+        int grade = 0;
+        for (int g = 0; g < kOreCount; g++)
+        {
+            if (roll < weights[g]) { grade = g; break; }
+            roll -= weights[g];
+        }
+
+        // 65% single block, 35% grows to 2-3 blocks into free neighbours
+        const int size = chance(0.35f) ? 2 + randInt(2) : 1;
+        int i = takeAt(randInt((int)open.size()));
+        for (int c = 0; c < size; c++)
+        {
+            m_Tiles[i] = Tile::Block;
+            m_OreGrade[i] = (uint8_t)grade;
+            m_BlockHp[i] = kOre[grade].baseHp + f * (2.0f + grade);
+            m_BlocksLeft++;
+
+            if (c == size - 1)
+                break;
+            const int d = randInt(4);
+            const int nx = i % W + kDX[d], nz = i / W + kDZ[d];
+            if (Get(nx, nz) != Tile::Floor)
+                break;
+            auto it = std::find(open.begin(), open.end(), nz * W + nx);
+            if (it == open.end())
+                break;
+            i = takeAt((size_t)(it - open.begin()));
+        }
+    }
+}
+
+// ---------------------------------------------------------------- mining
+
+int TileMap::BlocksInArc(float ox, float oz, float facing, float range, float arc, int* out, int maxOut) const
+{
+    int count = 0;
+    const int rays = std::max(3, (int)lroundf(arc * 4.0f));
+    for (int k = 0; k <= rays; k++)
+    {
+        const float a = facing - arc * 0.5f + arc * k / rays;
+        const float ca = cosf(a), sa = sinf(a);
+        for (float r = 0.4f; r <= range + 0.05f; r += 0.25f)
+        {
+            const int tx = (int)floorf(ox + ca * r);
+            const int tz = (int)floorf(oz + sa * r);
+            const Tile t = Get(tx, tz);
+            if (t == Tile::Wall)
+                break;
+            if (t == Tile::Block)
+            {
+                const int index = tz * W + tx;
+                bool already = false;
+                for (int n = 0; n < count; n++)
+                    if (out[n] == index) { already = true; break; }
+                if (!already && count < maxOut)
+                    out[count++] = index;
+                break;
+            }
+        }
+    }
+    return count;
+}
+
+MineResult TileMap::MineBlock(int x, int z, float power, int mineLevel)
+{
+    MineResult result;
+    if (Get(x, z) != Tile::Block)
+        return result;
+
+    const int i = z * W + x;
+    result.hit = true;
+    result.grade = m_OreGrade[i];
+
+    if (mineLevel < kOre[result.grade].requiredLevel)
+    {
+        power *= 0.25f;
+        result.tooHard = true;
+    }
+
+    m_BlockDamage[i] += power;
+    if (m_BlockDamage[i] >= m_BlockHp[i])
+    {
+        m_Tiles[i] = Tile::Floor;
+        m_BlockDamage[i] = 0.0f;
+        m_BlocksLeft--;
+        result.broken = true;
+    }
+    return result;
+}
+
+
 // ---------------------------------------------------------------- collision
 
 bool TileMap::BoxHits(float x, float z, float half) const
@@ -350,6 +477,27 @@ void TileMap::Draw()
             XMMatrixTranslation(center.x, center.y, center.z));
         ctx->Draw(m_CubeVertexCount, 0);
         m_DrawnWalls++;
+    }
+
+    // Ore blocks: tinted cubes that shrink a little as they take damage
+    for (int i = 0; i < W * H; i++)
+    {
+        if (m_Tiles[i] != Tile::Block)
+            continue;
+        const int x = i % W, z = i / W;
+        const float damage = std::min(1.0f, m_BlockDamage[i] / m_BlockHp[i]);
+        const float size = 0.8f * (1.0f - damage * 0.18f);
+        const Vector3 center(x + 0.5f, size * 0.5f, z + 0.5f);
+
+        if (camera && !camera->CheckView(center, 1.0f))
+            continue;
+
+        const OreDef& ore = kOre[m_OreGrade[i]];
+        material.Diffuse = XMFLOAT4(ore.r, ore.g, ore.b, 1.0f);
+        Renderer::SetMaterial(material);
+        Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
+            XMMatrixTranslation(center.x, center.y, center.z));
+        ctx->Draw(m_CubeVertexCount, 0);
     }
 
     // Stairs marker: a flat gold square

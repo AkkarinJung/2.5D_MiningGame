@@ -17,5 +17,6 @@ public:
 	void Draw();
 
 	void Add(int Score) { m_Score += Score; }
+	void SetScore(int Score) { m_Score = Score; }
 };
 

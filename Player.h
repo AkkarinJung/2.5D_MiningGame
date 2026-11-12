@@ -42,6 +42,16 @@ private:
     bool m_Hit = false;
     bool m_HitStop = false;
 
+    // Mining (M3). Fixed Miner values until classes arrive in M5.
+    int   m_MineLevel = 1;
+    float m_MineXp = 0.0f;
+    float m_MinePower = 5.0f;
+    float m_AttackCooldown = 0.0f;
+    Vector3 m_Facing{ 0.0f, 0.0f, 1.0f };
+
+    void Swing();
+    void GainMiningXp(float xp);
+
 public:
     void Init() override;
     void Uninit() override;
@@ -53,5 +63,6 @@ public:
 
 
     void SetAnimation(const char* AnimationName);
+    int GetMineLevel() const { return m_MineLevel; }
 };
 

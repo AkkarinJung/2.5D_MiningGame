@@ -16,6 +16,8 @@
 #include "Shadow.h"
 
 #include "TileMap.h"
+#include "OreData.h"
+#include "Score.h"
 
 void Player::Init()
 {
@@ -83,6 +85,8 @@ void Player::Update()
         break;
     }
 
+    m_AttackCooldown -= dt;
+
     Vector3 rot = m_Child->GetRotation();
     rot.y += 1.0f * dt;
     m_Child->SetRotation(rot);
@@ -90,7 +94,7 @@ void Player::Update()
     bool oldGround = m_Ground;
     m_Ground = false;
 
-    m_Rotation.y = atan2f(m_Velocity.x, m_Velocity.z);
+    m_Rotation.y = atan2f(m_Facing.x, m_Facing.z);   // face the last move direction
 
     //return scale to original
     //m_Scale.x += (1.0f - m_Scale.x) * 0.1f;
@@ -216,101 +220,53 @@ void Player::Update()
 
 void Player::UpdateGround()
 {
-    float dt = 1.0 / 60.0f;
+    const float dt = 1.0f / 60.0f;
 
     Camera* camera = Manager::GetGameObj<Camera>();
     Vector3 forward = camera->GetFoward();
     Vector3 right = camera->GetRight();
-
     forward.y = 0.0f;
     forward.normalize();
-
     right.y = 0.0f;
     right.normalize();
 
-    bool move = false;
+    Vector3 input(0.0f, 0.0f, 0.0f);
+    if (Input::GetKeyPress('D')) input += right;
+    if (Input::GetKeyPress('A')) input -= right;
+    if (Input::GetKeyPress('W')) input += forward;
+    if (Input::GetKeyPress('S')) input -= forward;
 
-    if (Input::GetKeyPress('D'))
-    {
-        m_Velocity += right * (20.0f * dt);
-        move = true;
-    }
-    if (Input::GetKeyPress('A'))
-    {
-        m_Velocity -= right * (20.0f * dt);
-        move = true;
-    }
-    if (Input::GetKeyPress('W'))
-    {
-        m_Velocity += forward * (20.0f * dt);
-        move = true;
-    }
-    if (Input::GetKeyPress('S'))
-    {
-        m_Velocity -= forward * (20.0f * dt);
-        move = true;
-    }
-
+    const float length = VectorMag(input);
+    const bool move = length > 0.0f;
     if (move)
     {
-        SetAnimation("Run");
-    }
-    else
-    {
-        SetAnimation("Idle");
+        input /= length;                        // diagonals are not faster
+        m_Velocity += input * (20.0f * dt);
+        m_Facing = input;
     }
 
-    if (Input::GetKeyTrigger(VK_SPACE))
+    if (m_State == STATE_GROUND)
+        SetAnimation(move ? "Run" : "Idle");
+
+    // Hold J or Space to swing; the cooldown sets the pace
+    if ((Input::GetKeyPress('J') || Input::GetKeyPress(VK_SPACE)) && m_AttackCooldown <= 0.0f)
     {
-        m_Velocity.y += 20.0f;
-
-        //m_Scale.y = 2.0f;
-        //m_Scale.x = 0.5f;
-        //m_Scale.z = 0.5f;
-
-        m_JumpSE->Play();
-    }
-
-    if (Input::GetKeyTrigger('J'))
-    {
-        m_Hit = false;
         m_State = STATE_ATTACK;
         m_StateTime = 0.0f;
+        m_AttackCooldown = 0.4f;
+        Swing();
     }
 }
+
 void Player::UpdateAttack()
 {
-    float dt = 1.0 / 60.0f;
+    const float dt = 1.0f / 60.0f;
 
-    if (!m_Hit && m_StateTime > 0.5f)
-    {
-        auto enemies = Manager::GetGameObjs<Enemy>();
-
-        for (auto enemy : enemies)
-        {
-            Vector3 dir = enemy->GetPosition() - m_Position;
-            float lenght = VectorMag(dir);
-            if (lenght < 2.0f)
-            {
-                dir.normalize();
-
-                enemy->AddDamage(1);
-                enemy->Shake(dir * 1.0f);
-
-                m_Hit = true;
-                m_HitStop = true;
-
-                break;
-            }
-        }
-    }
-
-    if (m_StateTime > 0.8f)
-        m_HitStop = false;
-
+    UpdateGround();             // you can still walk while swinging
     SetAnimation("Attack");
+
     m_StateTime += dt;
-    if (m_StateTime > 1.0f)
+    if (m_StateTime >= 0.4f)
         m_State = STATE_GROUND;
 }
 
@@ -339,6 +295,64 @@ void Player::SetAnimation(const char* AnimationName)
 
         m_Blend = 0.0f;
     }
+}
+
+// One pickaxe swing: find the blocks in the arc in front of the player and mine them.
+void Player::Swing()
+{
+    TileMap* map = Manager::GetGameObj<TileMap>();
+    if (!map)
+        return;
+
+    const float facing = atan2f(m_Facing.z, m_Facing.x);
+    int hits[16];
+    const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing,
+        1.15f, 1.3f,      // Miner reach and arc (radians)
+        hits, 16);
+
+    for (int k = 0; k < count; k++)
+    {
+        const int x = hits[k] % TileMap::W;
+        const int z = hits[k] / TileMap::W;
+        const MineResult result = map->MineBlock(x, z, m_MinePower, m_MineLevel);
+
+        if (result.tooHard)
+        {
+            char text[96];
+            sprintf_s(text, "Too hard! %s needs mining Lv%d\n",
+                kOre[result.grade].name, kOre[result.grade].requiredLevel);
+            OutputDebugStringA(text);
+        }
+        if (result.broken)
+        {
+            char text[96];
+            sprintf_s(text, "You dug out %s. (%d blocks left)\n",
+                kOre[result.grade].name, map->GetBlocksLeft());
+            OutputDebugStringA(text);
+            GainMiningXp((float)kOre[result.grade].xp);
+        }
+    }
+}
+
+// Mining XP: each level needs 8 + 7 per level and gives +1 mining power.
+void Player::GainMiningXp(float xp)
+{
+    m_MineXp += xp;
+    while (m_MineXp >= (float)MiningXpToNext(m_MineLevel))
+    {
+        m_MineXp -= (float)MiningXpToNext(m_MineLevel);
+        m_MineLevel++;
+        m_MinePower += 1.0f;
+
+        char text[64];
+        sprintf_s(text, "Mining Lv%d! (power %.0f)\n", m_MineLevel, m_MinePower);
+        OutputDebugStringA(text);
+        // M5: queue a card pick here, tagged with this ore grade
+    }
+
+    Score* level = Manager::GetGameObj<Score>();
+    if (level)
+        level->SetScore(m_MineLevel);
 }
 
 

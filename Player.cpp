@@ -15,11 +15,13 @@
 #include "Box.h"
 #include "Shadow.h"
 
+#include "TileMap.h"
+
 void Player::Init()
 {
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
-    m_Scale = { 0.01f, 0.01f, 0.01f };
+    m_Scale = { 0.005f, 0.005f, 0.005f };
 
 
     //ModelRenderer* m_ModelRenderer = AddGameComponent<ModelRenderer>(this);
@@ -51,7 +53,7 @@ void Player::Init()
     //ModelRenderer* childModel = m_Child->AddGameComponent<ModelRenderer>(m_Child);
     //childModel->Load("asset\\model\\Rabbit\\rabbit_1.obj");
     m_Shadow = Manager::AddGameObj<Shadow>();
-    m_Shadow->SetScale({ 1.5f ,1.5f ,1.5f });
+    m_Shadow->SetScale({ 0.4f, 0.4f, 0.4f });
 }
 
 void Player::Uninit()
@@ -101,7 +103,11 @@ void Player::Update()
     m_Velocity.z += -m_Velocity.z * 5.0f * dt;
 
 
-    m_Position += m_Velocity * dt;
+    TileMap* map = Manager::GetGameObj<TileMap>();
+    if (map)
+        map->MoveAndSlide(m_Position, m_Velocity, dt, 0.3f);   // 0.3 = player half-width in tiles
+    else
+        m_Position += m_Velocity * dt;
 
     const float height = 0.0f;   // flat dungeon floor
 
@@ -226,22 +232,22 @@ void Player::UpdateGround()
 
     if (Input::GetKeyPress('D'))
     {
-        m_Velocity += right * (50.0f * dt);
+        m_Velocity += right * (20.0f * dt);
         move = true;
     }
     if (Input::GetKeyPress('A'))
     {
-        m_Velocity -= right * (50.0f * dt);
+        m_Velocity -= right * (20.0f * dt);
         move = true;
     }
     if (Input::GetKeyPress('W'))
     {
-        m_Velocity += forward * (50.0f * dt);
+        m_Velocity += forward * (20.0f * dt);
         move = true;
     }
     if (Input::GetKeyPress('S'))
     {
-        m_Velocity -= forward * (50.0f * dt);
+        m_Velocity -= forward * (20.0f * dt);
         move = true;
     }
 

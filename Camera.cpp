@@ -8,7 +8,11 @@
 void Camera::Init()
 {
     m_Layer = 0;
-	m_Position = { 0.0f, 1.0f, -5.0f };
+    m_Position = { 0.0f, 10.2f, -6.4f };
+    m_Target = { 0.0f, 0.0f, 0.0f };
+    m_Shake = { 0.0f, 0.0f, 0.0f };
+
+    m_ShakeTime = 0.0f;
 }
 void Camera::Uninit()
 {
@@ -17,43 +21,44 @@ void Camera::Uninit()
 void  Camera::Update()
 {
     Player* player = Manager::GetGameObj<Player>();
-    Vector3 playerPos = player->GetPosition();
+    if (!player)
+        return;
+    
+    const float dt = 1.0f / 60.0f;
+    Vector3 goal = player->GetPosition();
+    goal.y = 0.0f;
 
-    float dt = 1.0 / 60.0f;
+    // Smooth follow; snap if the player teleported (new floor)
+    Vector3 diff = goal - m_Target;
+    if (VectorMag(diff) > 6.0f)
+        m_Target = goal;
+    else
+        m_Target += diff * std::min(1.0f, 8.0f * dt);
 
-    if (Input::GetKeyPress(VK_RIGHT))
-        m_Rotation.y += 3.0f * dt;
-    if (Input::GetKeyPress(VK_LEFT))
-        m_Rotation.y -= 3.0f * dt;
-
-    float t = 0.1f;
-    m_Target = m_Target * (1.0f - t) + (playerPos + Vector3(0.0f, 2.0f, 0.0f)) * t;
-
-    m_Target += m_Shake * cosf(m_ShakeTime * 100.0f);
+    Vector3 shake = m_Shake * cosf(m_ShakeTime * 100.0f);
     m_ShakeTime += dt;
-    m_Shake *= 0.9;
+    m_Shake *= 0.9f;
 
-    m_Position = m_Target + Vector3(-sinf(m_Rotation.y) * 5.0f,
-        2.0f,
-        -cosf(m_Rotation.y) * 5.0f);
+    // Top-down rig from the 2.5D prototype: about 58 degrees looking down
+    m_Position = m_Target + Vector3(0.0f, 10.2f, -6.4f) + shake;
+
 }
 void  Camera::Draw()
 {
-    // プロジェクションマトリクス
-    m_projection = XMMatrixPerspectiveFovLH(1.0f,
-        (float)SCREEN_WIDTH / SCREEN_HEIGHT, 1.0f, 1000.0f);
-
+    m_projection = XMMatrixPerspectiveFovLH(XMConvertToRadians(40.0f),
+        (float)SCREEN_WIDTH / SCREEN_HEIGHT, 0.1f, 100.0f);
     Renderer::SetProjectionMatrix(m_projection);
 
-    // ビューマトリクス
+    // Look slightly ahead of the player so they sit a bit below screen centre
+    Vector3 lookAt = m_Position + Vector3(0.0f, -10.2f, 6.6f);
+
     XMFLOAT3 up = XMFLOAT3(0.0f, 1.0f, 0.0f);
     m_ViewMatrix = XMMatrixLookAtLH(XMLoadFloat3((XMFLOAT3*)&m_Position),
-        XMLoadFloat3((XMFLOAT3*)&m_Target),
+        XMLoadFloat3((XMFLOAT3*)&lookAt),
         XMLoadFloat3(&up));
 
     Renderer::SetViewMatrix(m_ViewMatrix);
     Renderer::SetCameraPosition(m_Position);
-
 }
 
 bool Camera::CheckView(Vector3 Position, float Size)

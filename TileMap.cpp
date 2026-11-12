@@ -1,12 +1,11 @@
 // TileMap.cpp
 // Floor generation (border, 14 wall pieces, seal unreachable tiles, stairs on the
-// farthest tile) and drawing: the floor is one textured quad, walls are one cube
-// drawn per wall tile that touches open floor and is inside the camera view.
+// farthest tile, ore veins), mining, and drawing: the floor is one textured quad,
+// all walls are baked into one mesh per floor (one draw call), ore blocks are cubes.
 
 #include "main.h"
 #include "renderer.h"
 #include "manager.h"
-#include "Camera.h"
 #include "TileMap.h"
 #include "OreData.h"
 #include <random>
@@ -93,7 +92,8 @@ void TileMap::Init()
     m_FloorTexture = LoadTexture(L"asset\\texture\\block_field.png");
 
     // Cube without a bottom face; each side has its own shade so edges read clearly.
-    std::vector<VERTEX_3D> cube;
+    std::vector<VERTEX_3D>& cube = m_CubeVertices;
+    cube.clear();
     cube.reserve(30);
     AddFace(cube, XMFLOAT3(0, 1, 0), XMFLOAT3(1, 0, 0), XMFLOAT3(0, 0, 1), 1.00f); // top
     AddFace(cube, XMFLOAT3(0, 0, -1), XMFLOAT3(1, 0, 0), XMFLOAT3(0, 1, 0), 0.80f); // front (toward camera)
@@ -138,6 +138,7 @@ void TileMap::Init()
 void TileMap::Uninit()
 {
     SafeRelease(m_CubeVB);
+    SafeRelease(m_WallVB);
     SafeRelease(m_FloorVB);
     SafeRelease(m_QuadVB);
     SafeRelease(m_VertexLayout);
@@ -154,7 +155,7 @@ void TileMap::Update()
     GameObject::Update();
 }
 
-//--------------------- generation--------------------------
+// ---------------------------------------------------------------- generation
 
 void TileMap::Set(int x, int z, Tile t)
 {
@@ -283,7 +284,36 @@ void TileMap::Generate(uint32_t seed, int floorNo)
             if (nearOpen)
                 m_VisibleWalls.push_back(z * W + x);
         }
+
+    BuildWallMesh();
     PlaceOre(seed, floorNo);
+}
+
+// Bake every visible wall into one vertex buffer. Walls never change during a floor,
+// so this runs once per Generate and the whole dungeon's walls cost one draw call.
+void TileMap::BuildWallMesh()
+{
+    std::vector<VERTEX_3D> vertices;
+    vertices.reserve(m_VisibleWalls.size() * m_CubeVertices.size());
+
+    for (int index : m_VisibleWalls)
+    {
+        const int x = index % W, z = index / W;
+        const float height = 1.05f + ((x * 7 + z * 13) % 5) * 0.04f;   // slight height variation
+
+        for (VERTEX_3D v : m_CubeVertices)
+        {
+            v.Position.x = v.Position.x + x + 0.5f;
+            v.Position.y = (v.Position.y + 0.5f) * height;              // cube sits on the floor
+            v.Position.z = v.Position.z + z + 0.5f;
+            vertices.push_back(v);
+        }
+    }
+
+    SafeRelease(m_WallVB);
+    m_WallVertexCount = (UINT)vertices.size();
+    if (m_WallVertexCount > 0)
+        m_WallVB = CreateVB(vertices.data(), m_WallVertexCount);
 }
 
 // 7. Ore veins on tiles more than 2 steps from the start; rarer grades deeper.
@@ -411,7 +441,6 @@ MineResult TileMap::MineBlock(int x, int z, float power, int mineLevel)
     return result;
 }
 
-
 // ---------------------------------------------------------------- collision
 
 bool TileMap::BoxHits(float x, float z, float half) const
@@ -437,7 +466,8 @@ void TileMap::MoveAndSlide(Vector3& pos, Vector3& vel, float dt, float half) con
     pos.y += vel.y * dt;
 }
 
-// ----------------------------------drawing------------------------------
+// ---------------------------------------------------------------- drawing
+
 void TileMap::Draw()
 {
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
@@ -461,29 +491,18 @@ void TileMap::Draw()
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(4, 0);
 
-    // Walls: skip the ones outside the camera view (tile culling)
-    Camera* camera = Manager::GetGameObj<Camera>();
+    // Walls: one draw call for the whole floor
     ctx->PSSetShaderResources(0, 1, &m_WallTexture);
-    ctx->IASetVertexBuffers(0, 1, &m_CubeVB, &stride, &offset);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    m_DrawnWalls = 0;
-    for (int index : m_VisibleWalls)
+    if (m_WallVB)
     {
-        const int x = index % W, z = index / W;
-        const float height = 1.05f + ((x * 7 + z * 13) % 5) * 0.04f;   // slight height variation
-        const Vector3 center(x + 0.5f, height * 0.5f, z + 0.5f);
-
-        if (camera && !camera->CheckView(center, 1.0f))
-            continue;
-
-        Renderer::SetWorldMatrix(XMMatrixScaling(1.0f, height, 1.0f) *
-            XMMatrixTranslation(center.x, center.y, center.z));
-        ctx->Draw(m_CubeVertexCount, 0);
-        m_DrawnWalls++;
+        ctx->IASetVertexBuffers(0, 1, &m_WallVB, &stride, &offset);
+        ctx->Draw(m_WallVertexCount, 0);
     }
+    m_DrawnWalls = (int)m_VisibleWalls.size();
 
     // Ore blocks: tinted cubes that shrink a little as they take damage
+    ctx->IASetVertexBuffers(0, 1, &m_CubeVB, &stride, &offset);
     for (int i = 0; i < W * H; i++)
     {
         if (m_Tiles[i] != Tile::Block)
@@ -492,9 +511,6 @@ void TileMap::Draw()
         const float damage = std::min(1.0f, m_BlockDamage[i] / m_BlockHp[i]);
         const float size = 0.8f * (1.0f - damage * 0.18f);
         const Vector3 center(x + 0.5f, size * 0.5f, z + 0.5f);
-
-        if (camera && !camera->CheckView(center, 1.0f))
-            continue;
 
         const OreDef& ore = kOre[m_OreGrade[i]];
         material.Diffuse = XMFLOAT4(ore.r, ore.g, ore.b, 1.0f);

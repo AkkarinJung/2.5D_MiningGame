@@ -2,7 +2,9 @@
 // TileMap: one dungeon floor as a 48x34 grid of tiles.
 // Generates the layout (walls, pillars, broken wall runs, stairs) from a seed,
 // draws the floor and walls, and answers "is this tile solid?" for collision.
+
 #include "GameObject.h"
+#include "renderer.h"   // VERTEX_3D
 #include <vector>
 #include <cstdint>
 
@@ -39,6 +41,9 @@ private:
     int m_DrawnWalls = 0;
 
     ID3D11Buffer* m_CubeVB = nullptr;
+    ID3D11Buffer* m_WallVB = nullptr;           // every visible wall baked into one mesh
+    UINT m_WallVertexCount = 0;
+    std::vector<VERTEX_3D> m_CubeVertices;      // CPU copy of the unit cube, used for baking
     ID3D11Buffer* m_FloorVB = nullptr;
     ID3D11Buffer* m_QuadVB = nullptr;
     UINT m_CubeVertexCount = 0;
@@ -52,6 +57,7 @@ private:
     void Set(int x, int z, Tile t);
     bool BoxHits(float x, float z, float half) const;
     void PlaceOre(uint32_t seed, int floorNo);
+    void BuildWallMesh();
 
 public:
     void Init() override;
@@ -81,4 +87,3 @@ public:
     int GetDrawnWalls() const { return m_DrawnWalls; }
     int GetBlocksLeft() const { return m_BlocksLeft; }
 };
-

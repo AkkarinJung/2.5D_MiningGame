@@ -186,7 +186,11 @@
 			}
 		}
 
-
+		// Cache each vertex's bone pointers once (unordered_map keeps element addresses stable)
+		for (unsigned int m = 0; m < m_AiScene->mNumMeshes; m++)
+			for (DEFORM_VERTEX& dv : m_DeformVertex[m])
+				for (int b = 0; b < 4; b++)
+					dv.Bone[b] = &m_Bone[dv.BoneName[b]];
 
 		//テクスチャ読み込み
 		for (unsigned int i = 0; i < m_AiScene->mNumTextures; i++)
@@ -362,10 +366,10 @@
 				{
 					DEFORM_VERTEX* deformVertex = &m_DeformVertex[n][v];
 					aiMatrix4x4 matrix[4];
-					matrix[0] = m_Bone[deformVertex->BoneName[0]].Matrix;
-					matrix[1] = m_Bone[deformVertex->BoneName[1]].Matrix;
-					matrix[2] = m_Bone[deformVertex->BoneName[2]].Matrix;
-					matrix[3] = m_Bone[deformVertex->BoneName[3]].Matrix;
+					matrix[0] = deformVertex->Bone[0]->Matrix;
+					matrix[1] = deformVertex->Bone[1]->Matrix;
+					matrix[2] = deformVertex->Bone[2]->Matrix;
+					matrix[3] = deformVertex->Bone[3]->Matrix;
 
 					aiMatrix4x4 outMatrix;
 					outMatrix = matrix[0] * deformVertex->BoneWeight[0]

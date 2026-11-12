@@ -10,6 +10,7 @@
 
 #include "component.h"
 
+struct BONE;
 
 //変形後頂点構造体
 struct DEFORM_VERTEX
@@ -19,6 +20,7 @@ struct DEFORM_VERTEX
 	int				BoneNum;
 	std::string		BoneName[4];//本来はボーンインデックスで管理するべき
 	float			BoneWeight[4];
+	BONE*			Bone[4];// cached once after Load, so Update needs no string lookups
 };
 
 //ボーン構造体

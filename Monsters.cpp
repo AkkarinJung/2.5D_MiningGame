@@ -1,6 +1,5 @@
 // Monsters.cpp
 // Monster AI (wake/sleep, distance-map steering, slime hops, bat zigzag, goblin chase),
-// Floor pool: slimes and bats; goblins from floor 2, brutes from floor 3, more of both from 5.
 // brute wind-up and charge), contact damage, melee hits from the player, spawning,
 // potions (floor loot, drops, pickup), and drawing everything as camera-facing
 // pixel-art billboards built from MonsterData.h, with HP bars over hurt monsters.
@@ -154,7 +153,7 @@ void Monsters::Uninit()
 
 MonsterType Monsters::RandomType()
 {
-    // Floor pool: slimes and bats; goblins join from floor 2 (brutes come in a later step).
+    // Floor pool: slimes and bats; goblins from floor 2, brutes from floor 3, more of both from 5.
     MonsterType pool[10];
     int n = 0;
     pool[n++] = MonsterType::Slime;

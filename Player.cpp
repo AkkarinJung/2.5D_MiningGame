@@ -349,7 +349,7 @@ void Player::Swing()
 
     int hits[16];
     const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing,
-        m_AttackRange, m_AttackArc,      // Miner reach and arc (radians)
+        m_AttackRange, m_AttackArc,      // Class reach and arc (radians)
         hits, 16);
 
     for (int k = 0; k < count; k++)
@@ -365,7 +365,7 @@ void Player::Swing()
         {
             DebugUI::Log("You dug out %s. (%d blocks left)",
                 kOre[result.grade].name, map->GetBlocksLeft());
-            GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);;  // Miner: 1.5x
+            GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);  // Miner: 1.5x
         }
     }
 }

@@ -187,6 +187,7 @@ void Monsters::PopulateFloor(const TileMap& map)
     m_Seed = map.GetSeed();
     m_FloorNo = map.GetFloor();
     m_List.clear();
+    m_Potions.clear();
     m_FlowTile = -1;
     m_SpawnTimer = (float)std::max(7, 17 - m_FloorNo);
 
@@ -439,6 +440,9 @@ void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, flo
             vz = (sz + sx * swing) * def.speed;
             break;
         }
+        case MonsterType::Brute:            // walk, then wind up, charge and rest
+            UpdateBrute(m, map, px, pz, sx, sz, dt, vx, vz);
+            break;
         default:                            // goblin: run straight along the steering
             vx = sx * def.speed;
             vz = sz * def.speed;
@@ -447,6 +451,7 @@ void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, flo
     }
     else
     {
+        m.state = BruteWalk;
         // Asleep: wander, picking a new direction about 60% of seconds
         if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < dt * 0.6f)
         {

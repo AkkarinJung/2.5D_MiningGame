@@ -52,7 +52,7 @@ private:
 
     static const int kSpriteCount = kMonsterTypeCount + 1;     // monsters + potion
 
-    ID3D11Buffer* m_QuadVB[kMonsterTypeCount] = {};
+    ID3D11Buffer* m_QuadVB[kSpriteCount] = {};
     ID3D11InputLayout* m_VertexLayout = nullptr;
     ID3D11VertexShader* m_VertexShader = nullptr;
     ID3D11PixelShader* m_PixelShader = nullptr;

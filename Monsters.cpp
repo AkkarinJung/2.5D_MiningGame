@@ -1,7 +1,8 @@
 // Monsters.cpp
 // Monster AI (wake/sleep, distance-map steering, slime hops, bat zigzag, goblin chase),
-// contact damage to the player, melee hits from the player, spawning, and drawing each
-// monster as a camera-facing pixel-art billboard built from MonsterData.h.
+// brute wind-up and charge), contact damage, melee hits from the player, spawning,
+// potions (floor loot, drops, pickup), and drawing everything as camera-facing
+// pixel-art billboards built from MonsterData.h, with HP bars over hurt monsters.
 
 #include "main.h"
 #include "renderer.h"
@@ -20,6 +21,13 @@ namespace
     const int kDX[4] = { 0, 1, 0, -1 };
     const int kDZ[4] = { -1, 0, 1, 0 };
     const float kPlayerRadius = 0.3f;
+
+    enum BruteState : uint8_t { BruteWalk, BruteWindUp, BruteCharge, BruteRest };
+
+    const SpriteDef& SpriteFor(int k)
+    {
+        return k < kMonsterTypeCount ? kMonster[k].sprite : kPotionSprite;
+    }
 
     float AngleDiff(float a, float b)
     {
@@ -62,15 +70,15 @@ void Monsters::Init()
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\unlitTextureVS.cso");
     Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");
 
-    // Sprite atlas: every monster's 8x8 sprite side by side in one texture.
-    const int atlasW = 8 * kMonsterTypeCount, atlasH = 8;
+    // Sprite atlas: every 8x8 sprite (monsters, then the potion) side by side in one texture.
+    const int atlasW = 8 * kSpriteCount, atlasH = 8;
     std::vector<uint32_t> pixels(atlasW * atlasH, 0);
-    for (int k = 0; k < kMonsterTypeCount; k++)
+    for (int k = 0; k < kSpriteCount; k++)
         for (int y = 0; y < 8; y++)
             for (int x = 0; x < 8; x++)
             {
-                const char key = kMonster[k].rows[y][x];
-                for (const PaletteEntry& p : kMonster[k].palette)
+                const char key = SpriteFor(k).rows[y][x];
+                for (const PaletteEntry& p : SpriteFor(k).palette)
                     if (p.key != 0 && p.key == key)
                     {
                         const uint32_t r = (p.rgb >> 16) & 0xFF, g = (p.rgb >> 8) & 0xFF, b = p.rgb & 0xFF;
@@ -106,8 +114,8 @@ void Monsters::Init()
     sd.MaxLOD = D3D11_FLOAT32_MAX;
     Renderer::GetDevice()->CreateSamplerState(&sd, &m_PointSampler);
 
-    // One quad per type, anchored at the feet (y 0..1), facing -Z, UVs pointing into the atlas.
-    for (int k = 0; k < kMonsterTypeCount; k++)
+    // One quad per sprite, anchored at the feet (y 0..1), facing -Z, UVs pointing into the atlas.
+    for (int k = 0; k < kSpriteCount; k++)
     {
         const float u0 = (k * 8 + 0.01f) / atlasW, u1 = ((k + 1) * 8 - 0.01f) / atlasW;
         VERTEX_3D v[4];
@@ -146,14 +154,15 @@ void Monsters::Uninit()
 MonsterType Monsters::RandomType()
 {
     // Floor pool: slimes and bats; goblins join from floor 2 (brutes come in a later step).
-    MonsterType pool[8];
+    MonsterType pool[10];
     int n = 0;
     pool[n++] = MonsterType::Slime;
     pool[n++] = MonsterType::Bat;
     pool[n++] = MonsterType::Slime;
     pool[n++] = MonsterType::Bat;
     if (m_FloorNo >= 2) { pool[n++] = MonsterType::Goblin; pool[n++] = MonsterType::Goblin; }
-    if (m_FloorNo >= 5) { pool[n++] = MonsterType::Goblin; }
+    if (m_FloorNo >= 3) { pool[n++] = MonsterType::Brute; }
+    if (m_FloorNo >= 5) { pool[n++] = MonsterType::Goblin; pool[n++] = MonsterType::Brute; }
     return pool[std::uniform_int_distribution<int>(0, n - 1)(m_Rng)];
 }
 
@@ -197,6 +206,17 @@ void Monsters::PopulateFloor(const TileMap& map)
         spots[pick] = spots.back();
         spots.pop_back();
         Spawn(RandomType(), i % TileMap::W + 0.5f, i / TileMap::W + 0.5f);
+    }
+
+    // 1-2 potions lying around, also far from the start
+    const int potions = 1 + std::uniform_int_distribution<int>(0, 1)(m_Rng);
+    for (int k = 0; k < potions && !spots.empty(); k++)
+    {
+        const int pick = std::uniform_int_distribution<int>(0, (int)spots.size() - 1)(m_Rng);
+        const int i = spots[pick];
+        spots[pick] = spots.back();
+        spots.pop_back();
+        DropPotion(i % TileMap::W + 0.5f, i / TileMap::W + 0.5f);
     }
 }
 
@@ -336,6 +356,21 @@ void Monsters::Update()
             player->TakeDamage(m.attack, m.x, m.z, kMonster[(int)m.type].name);
     }
 
+    // Potion pickup
+    for (size_t i = 0; i < m_Potions.size();)
+    {
+        const float dx = p.x - m_Potions[i].x, dz = p.z - m_Potions[i].z;
+        if (dx * dx + dz * dz < 0.6f * 0.6f && !player->IsDead())
+        {
+            player->AddPotion();
+            DebugUI::Log("Picked up a red potion. (%d)", player->GetPotions());
+            m_Potions[i] = m_Potions.back();
+            m_Potions.pop_back();
+        }
+        else
+            i++;
+    }
+
     // New monsters trickle in out of sight
     m_SpawnTimer -= dt;
     if (m_SpawnTimer <= 0.0f)
@@ -434,6 +469,42 @@ void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, flo
     const float decay = powf(0.003f, dt);
     m.knockX *= decay;
     m.knockZ *= decay;
+}
+
+// Brute cycle: walk toward the player; when close (4.5) and in sight, wind up for 0.6 s
+// (flashing), charge in a straight line at 7.5 tiles/s for 0.5 s, rest 0.9 s, walk again.
+void Monsters::UpdateBrute(Monster& m, const TileMap& map, float px, float pz, float sx, float sz,
+    float dt, float& vx, float& vz)
+{
+    const MonsterDef& def = kMonster[(int)m.type];
+    const float dx = px - m.x, dz = pz - m.z;
+    const float d = sqrtf(dx * dx + dz * dz);
+    m.stateTimer -= dt;
+
+    switch (m.state)
+    {
+    case BruteWalk:
+        vx = sx * def.speed;
+        vz = sz * def.speed;
+        if (d < 4.5f && m.stateTimer <= 0.0f && ClearLine(map, m.x, m.z, px, pz))
+        {
+            m.state = BruteWindUp;
+            m.stateTimer = 0.6f;
+            m.chargeAngle = atan2f(dz, dx);     // locked in: sidestep to dodge
+        }
+        break;
+    case BruteWindUp:
+        if (m.stateTimer <= 0.0f) { m.state = BruteCharge; m.stateTimer = 0.5f; }
+        break;
+    case BruteCharge:
+        vx = cosf(m.chargeAngle) * 7.5f;
+        vz = sinf(m.chargeAngle) * 7.5f;
+        if (m.stateTimer <= 0.0f) { m.state = BruteRest; m.stateTimer = 0.9f; }
+        break;
+    default:    // BruteRest
+        if (m.stateTimer <= 0.0f) { m.state = BruteWalk; m.stateTimer = 1.0f; }
+        break;
+    }
 }
 
 // ---------------------------------------------------------------- combat
@@ -548,6 +619,42 @@ void Monsters::Draw()
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height * squash, 1.0f) *
             invView * XMMatrixTranslation(m.x, y, m.z));
         ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
+        ctx->Draw(4, 0);
+    }
+    // Potions bob gently on the floor
+    material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    Renderer::SetMaterial(material);
+    ctx->IASetVertexBuffers(0, 1, &m_QuadVB[kMonsterTypeCount], &stride, &offset);
+    for (const Potion& potion : m_Potions)
+    {
+        const float y = 0.05f + sinf(m_Time * 4.5f + potion.x) * 0.05f;
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.55f, 0.55f, 1.0f) *
+            invView * XMMatrixTranslation(potion.x, y, potion.z));
+        ctx->Draw(4, 0);
+    }
+    // HP bars over hurt monsters: dark background, red fill nudged toward the camera
+    material.TextureEnable = FALSE;
+    for (const Monster& m : m_List)
+    {
+        if (m.hp >= m.maxHp)
+            continue;
+        const MonsterDef& def = kMonster[(int)m.type];
+        const float barY = def.height + 0.15f + (m.type == MonsterType::Bat ? 0.45f : 0.0f);
+        const float w = 0.6f, h = 0.07f;
+        const float f = std::max(0.0f, m.hp / m.maxHp);
+        ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
+
+        material.Diffuse = XMFLOAT4(0.05f, 0.03f, 0.03f, 1.0f);
+        Renderer::SetMaterial(material);
+        Renderer::SetWorldMatrix(XMMatrixScaling(w, h, 1.0f) *
+            invView * XMMatrixTranslation(m.x, barY, m.z));
+        ctx->Draw(4, 0);
+
+        material.Diffuse = XMFLOAT4(0.82f, 0.33f, 0.31f, 1.0f);
+        Renderer::SetMaterial(material);
+        Renderer::SetWorldMatrix(XMMatrixScaling(w * f, h, 1.0f) *
+            XMMatrixTranslation(-(1.0f - f) * w * 0.5f, 0.0f, -0.01f) *
+            invView * XMMatrixTranslation(m.x, barY, m.z));
         ctx->Draw(4, 0);
     }
 

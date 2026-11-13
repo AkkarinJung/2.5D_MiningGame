@@ -4,12 +4,18 @@
 
 #include <cstdint>
 
-enum class MonsterType : uint8_t { Slime, Bat, Goblin, Count };
+enum class MonsterType : uint8_t { Slime, Bat, Goblin, Brute, Count };
 
 struct PaletteEntry
 {
     char     key;
     uint32_t rgb;       // 0xRRGGBB
+};
+
+struct SpriteDef
+{
+    const char* rows[8];        // '.' = transparent, other letters look up the palette
+    PaletteEntry palette[4];
 };
 
 struct MonsterDef
@@ -21,23 +27,34 @@ struct MonsterDef
     float sight;        // wakes when the player is this close and in line of sight
     float radius;       // collision half-width / circle radius
     float height;       // sprite height in tiles
-    const char* rows[8];        // '.' = transparent, other letters look up the palette
-    PaletteEntry palette[4];
+    float knockback;    // multiplier on knockback taken (the brute shrugs off 2/3)
+    SpriteDef sprite;
 };
 
 static const int kMonsterTypeCount = (int)MonsterType::Count;
 
 static const MonsterDef kMonster[kMonsterTypeCount] =
 {
-    { "Cave Slime", 8.0f, 2, 1.0f, 6.0f, 0.32f, 0.80f,
-      { "........", "........", "..pppp..", ".pwpppp.", ".peppep.", "pppppppp", "pppppppp", ".pppppp." },
-      { { 'p', 0x9a6be0 },{ 'w', 0xd6c2ff },{ 'e', 0x1a1024 },{ 0, 0 } } },
+    { "Cave Slime", 8.0f, 2, 1.0f, 6.0f, 0.32f, 0.80f, 1.0f,
+      { { "........", "........", "..pppp..", ".pwpppp.", ".peppep.", "pppppppp", "pppppppp", ".pppppp." },
+        { { 'p', 0x9a6be0 },{ 'w', 0xd6c2ff },{ 'e', 0x1a1024 },{ 0, 0 } } } },
 
-    { "Gloom Bat", 4.0f, 1, 3.3f, 8.0f, 0.25f, 0.75f,
-      { "........", "........", "r.r..r.r", "rrrrrrrr", "rryrryrr", ".rrrrrr.", "r..rr..r", "........" },
-      { { 'r', 0xc25a5a },{ 'y', 0xffd166 },{ 0, 0 },{ 0, 0 } } },
+    { "Gloom Bat", 4.0f, 1, 3.3f, 8.0f, 0.25f, 0.75f, 1.0f,
+      { { "........", "........", "r.r..r.r", "rrrrrrrr", "rryrryrr", ".rrrrrr.", "r..rr..r", "........" },
+        { { 'r', 0xc25a5a },{ 'y', 0xffd166 },{ 0, 0 },{ 0, 0 } } } },
 
-    { "Goblin", 12.0f, 3, 2.7f, 9.0f, 0.30f, 1.00f,
-      { "..g..g..", "..gggg..", ".grggrg.", "..gggg..", ".tttttt.", "g.tttt.g", "..tttt..", "..t..t.." },
-      { { 'g', 0x7d8c3a },{ 'r', 0xff5a4a },{ 't', 0x6a4a2e },{ 0, 0 } } },
+    { "Goblin", 12.0f, 3, 2.7f, 9.0f, 0.30f, 1.00f, 1.0f,
+      { { "..g..g..", "..gggg..", ".grggrg.", "..gggg..", ".tttttt.", "g.tttt.g", "..tttt..", "..t..t.." },
+        { { 'g', 0x7d8c3a },{ 'r', 0xff5a4a },{ 't', 0x6a4a2e },{ 0, 0 } } } },
+
+    { "Stone Brute", 32.0f, 5, 1.3f, 7.0f, 0.44f, 1.50f, 1.0f / 3.0f,
+      { { "..oooo..", ".oooooo.", ".okooko.", ".owwwwo.", "oooooooo", "otttttto", ".tt..tt.", "oo....oo" },
+        { { 'o', 0x8d8f99 },{ 'k', 0x1a1414 },{ 't', 0x5b4636 },{ 'w', 0xe8e0d0 } } } },
+};
+
+// Red potion lying on the floor: heals 40% of max HP.
+static const SpriteDef kPotionSprite =
+{
+    { "........", "...kk...", "...gg...", "..rrrr..", ".rrwrrr.", ".rrrrrr.", ".rrrrrr.", "..rrrr.." },
+    { { 'g', 0xcfd8dc },{ 'r', 0xd0554f },{ 'w', 0xffb3a8 },{ 'k', 0x6a4a2e } }
 };

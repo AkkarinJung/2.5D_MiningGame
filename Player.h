@@ -56,6 +56,7 @@ private:
     float m_Attack = 3.0f;
     float m_Invincible = 0.0f;
     bool  m_GodMode = false;
+    int   m_Potions = 1;        // start with 1
 
     void Swing();
 
@@ -81,5 +82,8 @@ public:
     int  GetMaxHp() const { return m_MaxHp; }
     bool IsDead() const { return m_Hp <= 0; }
     bool& GodMode() { return m_GodMode; }
+    void AddPotion() { m_Potions++; }
+    int  GetPotions() const { return m_Potions; }
+    void DrinkPotion();
 };
 

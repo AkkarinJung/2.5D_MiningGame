@@ -108,6 +108,26 @@ void DebugUI::Draw()
                 const Vector3 p = player->GetPosition();
                 ImGui::Text("Position  %.2f, %.2f", p.x, p.z);
                 ImGui::Text("Tile      %d, %d", (int)floorf(p.x), (int)floorf(p.z));
+
+                const int hp = player->GetHp(), maxHp = player->GetMaxHp();
+                char hpText[32];
+                snprintf(hpText, sizeof(hpText), "HP %d / %d", hp, maxHp);
+                ImGui::ProgressBar((float)std::max(0, hp) / (float)maxHp, ImVec2(-1.0f, 0.0f), hpText);
+                if (ImGui::Checkbox("God mode", &player->GodMode()))
+                    Log("[debug] god mode %s", player->GodMode() ? "on" : "off");
+                ImGui::SameLine();
+                if (ImGui::Button("Heal to full"))
+                {
+                    player->HealFull();
+                    Log("[debug] healed to full");
+                }
+                ImGui::Text("Potions %d  (Q to drink)", player->GetPotions());
+                ImGui::SameLine();
+                if (ImGui::Button("+1 potion"))
+                {
+                    player->AddPotion();
+                    Log("[debug] added a potion");
+                }
             }
 
             // ---- Mining
@@ -184,12 +204,13 @@ void DebugUI::Draw()
             Monsters* monsters = Manager::GetGameObj<Monsters>();
             if (monsters && ImGui::CollapsingHeader("Monsters", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                ImGui::Text("Count %d    awake %d", monsters->Count(), monsters->AwakeCount());
+                ImGui::Text("Count %d    awake %d    potions on floor %d",
+                    monsters->Count(), monsters->AwakeCount(), monsters->PotionsOnFloor());
                 ImGui::Checkbox("Freeze AI", &monsters->Frozen());
 
                 for (int t = 0; t < kMonsterTypeCount; t++)
                 {
-                    if (t > 0)
+                    if (t % 2 == 1)
                         ImGui::SameLine();
                     char label[48];
                     snprintf(label, sizeof(label), "+ %s", kMonster[t].name);

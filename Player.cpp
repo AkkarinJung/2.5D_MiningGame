@@ -254,6 +254,9 @@ void Player::UpdateGround()
     if (m_State == STATE_GROUND)
         SetAnimation(move ? "Run" : "Idle");
 
+    if (Input::GetKeyTrigger('Q'))
+        DrinkPotion();
+
     // Hold J or Space to swing; the cooldown sets the pace
     if ((Input::GetKeyPress('J') || Input::GetKeyPress(VK_SPACE)) && m_AttackCooldown <= 0.0f)
     {
@@ -388,4 +391,14 @@ void Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
         DebugUI::Log("Slain by the %s...", source);
 }
 
+// Q: drink a potion, healing 40% of max HP (rounded up, never above max).
+void Player::DrinkPotion()
+{
+    if (IsDead() || m_Potions <= 0 || m_Hp >= m_MaxHp)
+        return;
 
+    const int heal = std::min(m_MaxHp - m_Hp, (int)ceilf(m_MaxHp * 0.4f));
+    m_Hp += heal;
+    m_Potions--;
+    DebugUI::Log("You drink a potion. +%d HP (%d left)", heal, m_Potions);
+}

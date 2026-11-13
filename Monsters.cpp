@@ -533,13 +533,15 @@ int Monsters::HitInArc(float ox, float oz, float facing, float range, float arc,
         m.awake = true;
         if (dist > 0.0f)
         {
-            m.knockX += dx / dist * 3.0f;
-            m.knockZ += dz / dist * 3.0f;
+            m.knockX += dx / dist * 3.0f * def.knockback;
+            m.knockZ += dz / dist * 3.0f * def.knockback;
         }
         if (m.hp <= 0.0f)
         {
             kills++;
             DebugUI::Log("You defeated the %s.", def.name);
+            if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)
+                DropPotion(m.x, m.z);           // 12% potion drop
         }
     }
     RemoveDead();
@@ -579,7 +581,7 @@ int Monsters::AwakeCount() const
 void Monsters::Draw()
 {
     Camera* camera = Manager::GetGameObj<Camera>();
-    if (!camera || m_List.empty())
+    if (!camera || (m_List.empty() && m_Potions.empty()))
         return;
 
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
@@ -618,11 +620,16 @@ void Monsters::Draw()
             squash = 1.0f - hop * 0.15f;
         }
 
-        const float bright = m.flash > 0.0f ? 4.0f : 1.0f;     // hit flash
+        // Brute wind-up: shakes and flickers white as a warning
+        const bool windUp = m.type == MonsterType::Brute && m.state == BruteWindUp;
+        const float shakeX = windUp ? sinf(m_Time * 90.0f) * 0.04f : 0.0f;
+        const bool flicker = windUp && ((int)(m_Time / 0.07f) % 2) == 0;
+
+        const float bright = (m.flash > 0.0f || flicker) ? 4.0f : 1.0f;     // hit flash
         material.Diffuse = XMFLOAT4(bright, bright, bright, 1.0f);
         Renderer::SetMaterial(material);
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height * squash, 1.0f) *
-            invView * XMMatrixTranslation(m.x, y, m.z));
+            invView * XMMatrixTranslation(m.x + shakeX, y, m.z));
         ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
         ctx->Draw(4, 0);
     }

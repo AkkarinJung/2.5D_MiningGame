@@ -10,6 +10,7 @@
 #include "TileMap.h"
 #include "OreData.h"
 #include "Monsters.h"
+#include "ClassData.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
@@ -21,6 +22,7 @@
 namespace
 {
     bool g_Visible = true;
+    bool g_InFrame = false;     // BeginFrame ran and Draw has not rendered it yet
     bool g_ShowDemo = false;
 
     // Fixed-size ring buffer: no allocations while playing.
@@ -77,11 +79,19 @@ void DebugUI::Log(const char* format, ...)
         g_LogCount++;
 }
 
-void DebugUI::Draw()
+void DebugUI::BeginFrame()
 {
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
+    g_InFrame = true;
+}
+
+void DebugUI::Draw()
+{
+    if (!g_InFrame)
+        return;
+    g_InFrame = false;
 
     if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
         g_Visible = !g_Visible;
@@ -106,6 +116,7 @@ void DebugUI::Draw()
             if (player && ImGui::CollapsingHeader("Player", ImGuiTreeNodeFlags_DefaultOpen))
             {
                 const Vector3 p = player->GetPosition();
+                ImGui::Text("Class     %s", kClass[(int)player->GetClass()].name);
                 ImGui::Text("Position  %.2f, %.2f", p.x, p.z);
                 ImGui::Text("Tile      %d, %d", (int)floorf(p.x), (int)floorf(p.z));
 

@@ -7,6 +7,7 @@
 #include "Game.h"
 #include "GameObject.h"
 #include "Fade.h"
+#include "ClassSelect.h"
 
 void Title::Init()
 {
@@ -25,7 +26,8 @@ void Title::Update()
 	if (Input::GetKeyTrigger(VK_RETURN))
 	{
 		//Manager::ChangeScene<Game>(3.0f);
-		Manager::AddGameObj<Fade>()->Init(true, new Game());
+		//Manager::AddGameObj<Fade>()->Init(true, new Game());
+		Manager::AddGameObj<Fade>()->Init(true, new ClassSelect());
 	}
 }
 

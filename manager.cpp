@@ -52,6 +52,7 @@ void Manager::Update()
 {
 	float dt = 1.0f / 60.0f;
 	Input::Update();
+	DebugUI::BeginFrame();
 
 	if (m_Scene != nullptr)
 		m_Scene->Update();

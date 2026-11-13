@@ -2,6 +2,7 @@
 
 #include "GameObject.h"
 #include "animationModel.h"
+#include "ClassData.h"
 
 class Player : public GameObject
 {
@@ -58,6 +59,16 @@ private:
     bool  m_GodMode = false;
     int   m_Potions = 1;        // start with 1
 
+    // Class (M5): filled from kClass in Init
+    PlayerClass m_Class = PlayerClass::Miner;
+    float m_Speed = 4.0f;
+    float m_AttackRate = 0.4f;      // seconds between swings
+    float m_AttackRange = 1.15f;
+    float m_AttackArc = 1.3f;
+    float m_InvincibleTime = 0.6f;
+    float m_Crit = 0.0f;
+    float m_MiningXpScale = 1.0f;
+
     void Swing();
 
 
@@ -85,5 +96,7 @@ public:
     void AddPotion() { m_Potions++; }
     int  GetPotions() const { return m_Potions; }
     void DrinkPotion();
+
+    PlayerClass GetClass() const { return m_Class; }
 };
 

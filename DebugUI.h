@@ -8,6 +8,7 @@ class DebugUI
 public:
     static void Init();             // after Renderer::Init (needs the window and device)
     static void Uninit();           // before Renderer::Uninit
+    static void BeginFrame();       // start of Manager::Update: game UI may use ImGui from here on
     static void Draw();             // after the scene is drawn, before Present
 
     static void Log(const char* format, ...);   // printf-style, also goes to VS Output

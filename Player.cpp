@@ -21,8 +21,24 @@
 #include "OreData.h"
 #include "Score.h"
 
+#include <random>
+
 void Player::Init()
 {
+    // Class stats (chosen on the class select screen)
+    m_Class = SelectedClass();
+    const ClassDef& cls = kClass[(int)m_Class];
+    m_MaxHp = m_Hp = cls.hp;
+    m_Speed = cls.speed;
+    m_Attack = cls.attack;
+    m_MinePower = cls.mining;
+    m_AttackRate = cls.cooldown;
+    m_AttackRange = cls.range;
+    m_AttackArc = cls.arc;
+    m_InvincibleTime = cls.invincibility;
+    m_Crit = cls.crit;
+    m_MiningXpScale = cls.miningXpScale;
+
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
     m_Scale = { 0.005f, 0.005f, 0.005f };
@@ -247,7 +263,7 @@ void Player::UpdateGround()
     if (move)
     {
         input /= length;                        // diagonals are not faster
-        m_Velocity += input * (20.0f * dt);
+        m_Velocity += input * (m_Speed * 5.0f * dt);   // friction is 5/s, so top speed = m_Speed
         m_Facing = input;
     }
 
@@ -262,7 +278,7 @@ void Player::UpdateGround()
     {
         m_State = STATE_ATTACK;
         m_StateTime = 0.0f;
-        m_AttackCooldown = 0.4f;
+        m_AttackCooldown = m_AttackRate;
         Swing();
     }
 }
@@ -275,7 +291,7 @@ void Player::UpdateAttack()
     SetAnimation("Attack");
 
     m_StateTime += dt;
-    if (m_StateTime >= 0.4f)
+    if (m_StateTime >= m_AttackRate)
         m_State = STATE_GROUND;
 }
 
@@ -314,9 +330,18 @@ void Player::Swing()
 {
     const float facing = atan2f(m_Facing.z, m_Facing.x);
 
+    // Crit: double damage
+    static std::mt19937 rng(std::random_device{}());
+    float damage = m_Attack;
+    if (std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < m_Crit)
+    {
+        damage *= 2.0f;
+        DebugUI::Log("Critical!");
+    }
+
     Monsters* monsters = Manager::GetGameObj<Monsters>();
     if (monsters)
-        monsters->HitInArc(m_Position.x, m_Position.z, facing, 1.15f, 1.3f, m_Attack);
+        monsters->HitInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, damage);
 
     TileMap* map = Manager::GetGameObj<TileMap>();
     if (!map)
@@ -324,7 +349,7 @@ void Player::Swing()
 
     int hits[16];
     const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing,
-        1.15f, 1.3f,      // Miner reach and arc (radians)
+        m_AttackRange, m_AttackArc,      // Miner reach and arc (radians)
         hits, 16);
 
     for (int k = 0; k < count; k++)
@@ -340,7 +365,7 @@ void Player::Swing()
         {
             DebugUI::Log("You dug out %s. (%d blocks left)",
                 kOre[result.grade].name, map->GetBlocksLeft());
-            GainMiningXp((float)kOre[result.grade].xp);
+            GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);;  // Miner: 1.5x
         }
     }
 }
@@ -372,7 +397,7 @@ void Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
 
     const int damage = std::max(1, amount - m_Armor);
     m_Hp -= damage;
-    m_Invincible = 0.6f;
+    m_Invincible = m_InvincibleTime;   // Warrior: 1 s
 
     const float dx = m_Position.x - fromX, dz = m_Position.z - fromZ;
     const float len = sqrtf(dx * dx + dz * dz);

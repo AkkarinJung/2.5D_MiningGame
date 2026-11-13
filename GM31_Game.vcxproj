@@ -23,6 +23,7 @@
     <ClCompile Include="audio.cpp" />
     <ClCompile Include="Box.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="ClassSelect.cpp" />
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DebugUI.cpp" />
     <ClCompile Include="Enemy.cpp" />
@@ -59,6 +60,8 @@
     <ClInclude Include="audio.h" />
     <ClInclude Include="Box.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="ClassData.h" />
+    <ClInclude Include="ClassSelect.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="component.h" />
     <ClInclude Include="DebugUI.h" />

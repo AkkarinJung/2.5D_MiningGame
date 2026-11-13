@@ -10,6 +10,8 @@
 #include "GameObject.h"
 #include "Score.h"
 #include <random>
+#include "Monsters.h"
+#include "Result.h"
 
 void Game::Init()
 {
@@ -17,6 +19,8 @@ void Game::Init()
     TileMap* map = Manager::AddGameObj<TileMap>();
     Player* player = Manager::AddGameObj<Player>();
     player->SetPosition(map->GetStartPosition());
+
+    Manager::AddGameObj<Monsters>();
 
     Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
     level->SetPosition({ 20.0f, 20.0f, 0.0f });
@@ -33,7 +37,11 @@ void Game::Update()
     Player* player = Manager::GetGameObj<Player>();
     if (!map || !player)
         return;
-
+    if (player->IsDead())
+    {
+        Manager::ChangeScene<Result>(1.5f);     // death screen comes in M6
+        return;
+    }
     // G: brand-new random floor (for testing until the F1 debug panel exists)
     if (Input::GetKeyTrigger('G'))
     {

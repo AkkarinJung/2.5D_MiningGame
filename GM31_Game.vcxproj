@@ -41,6 +41,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="manager.cpp" />
     <ClCompile Include="modelRenderer.cpp" />
+    <ClCompile Include="Monsters.cpp" />
     <ClCompile Include="Particle.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Polygon2D.cpp" />
@@ -80,6 +81,8 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="manager.h" />
     <ClInclude Include="modelRenderer.h" />
+    <ClInclude Include="Monsters.h" />
+    <ClInclude Include="MonsterData.h" />
     <ClInclude Include="OreData.h" />
     <ClInclude Include="Particle.h" />
     <ClInclude Include="Player.h" />

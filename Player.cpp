@@ -12,6 +12,7 @@
 #include "DebugUI.h"
 
 #include "Enemy.h"
+#include "Monsters.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -87,6 +88,7 @@ void Player::Update()
     }
 
     m_AttackCooldown -= dt;
+    m_Invincible -= dt;
 
     Vector3 rot = m_Child->GetRotation();
     rot.y += 1.0f * dt;
@@ -223,6 +225,9 @@ void Player::UpdateGround()
 {
     const float dt = 1.0f / 60.0f;
 
+    if (IsDead())
+        return;     // no moving or swinging once HP hits 0
+
     Camera* camera = Manager::GetGameObj<Camera>();
     Vector3 forward = camera->GetFoward();
     Vector3 right = camera->GetRight();
@@ -273,6 +278,9 @@ void Player::UpdateAttack()
 
 void Player::Draw()
 {
+    if (m_Invincible > 0.0f && !IsDead() && ((int)(m_Invincible * 14.0f) % 2) == 1)
+        return;
+
     // 入力レイアウト設定
     Renderer::GetDeviceContext()->IASetInputLayout(m_VertexLayout);
 
@@ -298,14 +306,19 @@ void Player::SetAnimation(const char* AnimationName)
     }
 }
 
-// One pickaxe swing: find the blocks in the arc in front of the player and mine them.
+// One swing: hit monsters in the arc, then mine the blocks in it.
 void Player::Swing()
 {
+    const float facing = atan2f(m_Facing.z, m_Facing.x);
+
+    Monsters* monsters = Manager::GetGameObj<Monsters>();
+    if (monsters)
+        monsters->HitInArc(m_Position.x, m_Position.z, facing, 1.15f, 1.3f, m_Attack);
+
     TileMap* map = Manager::GetGameObj<TileMap>();
     if (!map)
         return;
 
-    const float facing = atan2f(m_Facing.z, m_Facing.x);
     int hits[16];
     const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing,
         1.15f, 1.3f,      // Miner reach and arc (radians)
@@ -348,5 +361,31 @@ void Player::GainMiningXp(float xp)
         level->SetScore(m_MineLevel);
 }
 
+// Contact damage from a monster: armor, minimum 1, 0.6 s invincibility, knockback away.
+void Player::TakeDamage(int amount, float fromX, float fromZ, const char* source)
+{
+    if (m_Invincible > 0.0f || IsDead() || m_GodMode)
+        return;
+
+    const int damage = std::max(1, amount - m_Armor);
+    m_Hp -= damage;
+    m_Invincible = 0.6f;
+
+    const float dx = m_Position.x - fromX, dz = m_Position.z - fromZ;
+    const float len = sqrtf(dx * dx + dz * dz);
+    if (len > 0.0001f)
+    {
+        m_Velocity.x += dx / len * 6.0f;
+        m_Velocity.z += dz / len * 6.0f;
+    }
+
+    Camera* camera = Manager::GetGameObj<Camera>();
+    if (camera)
+        camera->Shake(Vector3(0.12f, 0.0f, 0.12f));
+
+    DebugUI::Log("The %s hits you for %d. (HP %d/%d)", source, damage, std::max(0, m_Hp), m_MaxHp);
+    if (IsDead())
+        DebugUI::Log("Slain by the %s...", source);
+}
 
 

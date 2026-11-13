@@ -9,6 +9,7 @@
 #include "Player.h"
 #include "TileMap.h"
 #include "OreData.h"
+#include "Monsters.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
@@ -178,6 +179,40 @@ void DebugUI::Draw()
                     Log("[debug] went down to floor %d", map->GetFloor());
                 }
             }
+
+            // ---- Monsters
+            Monsters* monsters = Manager::GetGameObj<Monsters>();
+            if (monsters && ImGui::CollapsingHeader("Monsters", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                ImGui::Text("Count %d    awake %d", monsters->Count(), monsters->AwakeCount());
+                ImGui::Checkbox("Freeze AI", &monsters->Frozen());
+
+                for (int t = 0; t < kMonsterTypeCount; t++)
+                {
+                    if (t > 0)
+                        ImGui::SameLine();
+                    char label[48];
+                    snprintf(label, sizeof(label), "+ %s", kMonster[t].name);
+                    if (ImGui::Button(label) && player && map)
+                    {
+                        // Spawn on the first free tile around the player, 3 tiles out if possible
+                        const Vector3 p = player->GetPosition();
+                        const int px = (int)floorf(p.x), pz = (int)floorf(p.z);
+                        int sx = px, sz = pz;
+                        const int offsets[8][2] = { { 3,0 },{ -3,0 },{ 0,3 },{ 0,-3 },{ 2,2 },{ -2,2 },{ 2,-2 },{ -2,-2 } };
+                        for (const auto& o : offsets)
+                            if (map->Get(px + o[0], pz + o[1]) == Tile::Floor) { sx = px + o[0]; sz = pz + o[1]; break; }
+                        monsters->Spawn((MonsterType)t, sx + 0.5f, sz + 0.5f);
+                        Log("[debug] spawned a %s", kMonster[t].name);
+                    }
+                }
+                if (ImGui::Button("Kill all"))
+                {
+                    monsters->KillAll();
+                    Log("[debug] killed all monsters");
+                }
+            }
+
 
             // ---- Render
             if (ImGui::CollapsingHeader("Render"))

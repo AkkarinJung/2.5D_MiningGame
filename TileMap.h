@@ -86,4 +86,8 @@ public:
     int GetFloor() const { return m_FloorNo; }
     int GetDrawnWalls() const { return m_DrawnWalls; }
     int GetBlocksLeft() const { return m_BlocksLeft; }
+    int GetStartDistance(int x, int z) const     // steps from the start tile, -1 = unreachable
+    {
+        return (x < 0 || z < 0 || x >= W || z >= H) ? -1 : m_Dist[z * W + x];
+    }
 };

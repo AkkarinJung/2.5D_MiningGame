@@ -49,6 +49,14 @@ private:
     float m_AttackCooldown = 0.0f;
     Vector3 m_Facing{ 0.0f, 0.0f, 1.0f };
 
+    // Health (M4). Miner values until classes arrive in M5.
+    int   m_Hp = 24;
+    int   m_MaxHp = 24;
+    int   m_Armor = 0;
+    float m_Attack = 3.0f;
+    float m_Invincible = 0.0f;
+    bool  m_GodMode = false;
+
     void Swing();
 
 
@@ -66,5 +74,12 @@ public:
     int GetMineLevel() const { return m_MineLevel; }
     float GetMineXp() const { return m_MineXp; }
     float GetMinePower() const { return m_MinePower; }
+
+    void TakeDamage(int amount, float fromX, float fromZ, const char* source);
+    void HealFull() { m_Hp = m_MaxHp; }
+    int  GetHp() const { return m_Hp; }
+    int  GetMaxHp() const { return m_MaxHp; }
+    bool IsDead() const { return m_Hp <= 0; }
+    bool& GodMode() { return m_GodMode; }
 };
 

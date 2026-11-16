@@ -129,6 +129,9 @@
     <ClCompile Include="ClassSelect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Projectiles.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
@@ -258,6 +261,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="ClassSelect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteAtlas.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Projectiles.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

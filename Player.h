@@ -69,7 +69,17 @@ private:
     float m_Crit = 0.0f;
     float m_MiningXpScale = 1.0f;
 
-    void Swing();
+    // Skills (M5 step 2)
+    float m_SkillTimer = 0.0f;      // > 0: skill on cooldown
+    float m_DashTime = 0.0f;        // > 0: Rogue Shadow Dash in progress
+    float m_DashAngle = 0.0f;
+    int   m_DashId = 0;
+    float m_DashDamage = 0.0f;
+
+    void Attack();                  // melee swing or Mage bolt
+    void UseSkill();
+    float AimAngle(float reach);    // nearest visible monster in reach, else facing
+    float RollDamage(float base);   // crit: double damage
 
 
 public:
@@ -98,5 +108,10 @@ public:
     void DrinkPotion();
 
     PlayerClass GetClass() const { return m_Class; }
+
+    // Mine the block on (x, z) with this power; handles "too hard", logging and XP.
+    void MineTile(int x, int z, float power);
+    float GetSkillTimer() const { return m_SkillTimer; }
+    float GetSkillCooldown() const { return kClass[(int)m_Class].skillCooldown; }
 };
 

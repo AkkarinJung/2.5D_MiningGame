@@ -132,6 +132,16 @@ void DebugUI::Draw()
                     player->HealFull();
                     Log("[debug] healed to full");
                 }
+                const float skillLeft = std::max(0.0f, player->GetSkillTimer());
+                char skillText[64];
+                if (skillLeft > 0.0f)
+                    snprintf(skillText, sizeof(skillText), "%s  %.1fs",
+                        kClass[(int)player->GetClass()].skillName, skillLeft);
+                else
+                    snprintf(skillText, sizeof(skillText), "%s  ready (K / Shift)",
+                        kClass[(int)player->GetClass()].skillName);
+                ImGui::ProgressBar(1.0f - skillLeft / player->GetSkillCooldown(), ImVec2(-1.0f, 0.0f), skillText);
+
                 ImGui::Text("Potions %d  (Q to drink)", player->GetPotions());
                 ImGui::SameLine();
                 if (ImGui::Button("+1 potion"))

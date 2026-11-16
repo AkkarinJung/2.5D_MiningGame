@@ -13,6 +13,7 @@
 
 #include "Enemy.h"
 #include "Monsters.h"
+#include "Projectiles.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -105,6 +106,7 @@ void Player::Update()
 
     m_AttackCooldown -= dt;
     m_Invincible -= dt;
+    m_SkillTimer -= dt;
 
     Vector3 rot = m_Child->GetRotation();
     rot.y += 1.0f * dt;
@@ -127,7 +129,22 @@ void Player::Update()
 
 
     TileMap* map = Manager::GetGameObj<TileMap>();
-    if (map)
+    if (m_DashTime > 0.0f && map)
+    {
+        // Shadow Dash: 24 tiles/s in 4 substeps, cutting every monster passed once
+        m_DashTime -= dt;
+        Monsters* monsters = Manager::GetGameObj<Monsters>();
+        const float step = 24.0f * dt / 4.0f;
+        for (int s = 0; s < 4; s++)
+        {
+            Vector3 move(cosf(m_DashAngle) * step, 0.0f, sinf(m_DashAngle) * step);
+            map->MoveAndSlide(m_Position, move, 1.0f, 0.3f);
+            if (monsters)
+                monsters->HitAlongDash(m_Position.x, m_Position.z, m_DashDamage, m_DashId);
+        }
+        m_Velocity.x = m_Velocity.z = 0.0f;
+    }
+    else if (map)
         map->MoveAndSlide(m_Position, m_Velocity, dt, 0.3f);   // 0.3 = player half-width in tiles
     else
         m_Position += m_Velocity * dt;
@@ -279,8 +296,12 @@ void Player::UpdateGround()
         m_State = STATE_ATTACK;
         m_StateTime = 0.0f;
         m_AttackCooldown = m_AttackRate;
-        Swing();
+        Attack();
     }
+
+    // K or Shift: class skill
+    if ((Input::GetKeyTrigger('K') || Input::GetKeyTrigger(VK_SHIFT)) && m_SkillTimer <= 0.0f && m_DashTime <= 0.0f)
+        UseSkill();
 }
 
 void Player::UpdateAttack()
@@ -325,48 +346,147 @@ void Player::SetAnimation(const char* AnimationName)
     }
 }
 
-// One swing: hit monsters in the arc, then mine the blocks in it.
-void Player::Swing()
+float Player::RollDamage(float base)
 {
-    const float facing = atan2f(m_Facing.z, m_Facing.x);
-
-    // Crit: double damage
     static std::mt19937 rng(std::random_device{}());
-    float damage = m_Attack;
     if (std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < m_Crit)
     {
-        damage *= 2.0f;
         DebugUI::Log("Critical!");
+        return base * 2.0f;
     }
+    return base;
+}
+
+// Keyboard auto-aim: the nearest monster the player can see within reach, else facing.
+float Player::AimAngle(float reach)
+{
+    float angle = atan2f(m_Facing.z, m_Facing.x);
+    Monsters* monsters = Manager::GetGameObj<Monsters>();
+    if (monsters && monsters->FindTarget(m_Position.x, m_Position.z, reach, angle))
+        m_Facing = Vector3(cosf(angle), 0.0f, sinf(angle));     // turn to face the target
+    return angle;
+}
+
+// One attack: the Mage fires a bolt; everyone else swings at monsters and blocks in the arc.
+void Player::Attack()
+{
+    const ClassDef& cls = kClass[(int)m_Class];
+
+    if (cls.ranged)
+    {
+        const float angle = AimAngle(7.0f);
+        Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
+        if (projectiles)
+            projectiles->FireBolt(m_Position.x, m_Position.z, angle, RollDamage(m_Attack), m_MinePower);
+        return;
+    }
+
+    const float facing = AimAngle(m_AttackRange + 1.3f);
 
     Monsters* monsters = Manager::GetGameObj<Monsters>();
     if (monsters)
-        monsters->HitInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, damage);
+        monsters->HitInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, RollDamage(m_Attack));
 
     TileMap* map = Manager::GetGameObj<TileMap>();
     if (!map)
         return;
-
     int hits[16];
-    const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing,
-        m_AttackRange, m_AttackArc,      // Class reach and arc (radians)
-        hits, 16);
-
+    const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, hits, 16);
     for (int k = 0; k < count; k++)
-    {
-        const int x = hits[k] % TileMap::W;
-        const int z = hits[k] / TileMap::W;
-        const MineResult result = map->MineBlock(x, z, m_MinePower, m_MineLevel);
+        MineTile(hits[k] % TileMap::W, hits[k] / TileMap::W, m_MinePower);
+}
 
-        if (result.tooHard)
-            DebugUI::Log("Too hard! %s needs mining Lv%d",
-                kOre[result.grade].name, kOre[result.grade].requiredLevel);
-        if (result.broken)
+// K / Shift: the class skill, then its cooldown.
+void Player::UseSkill()
+{
+    if (IsDead())
+        return;
+
+    const ClassDef& cls = kClass[(int)m_Class];
+    m_SkillTimer = cls.skillCooldown;
+
+    Monsters* monsters = Manager::GetGameObj<Monsters>();
+    Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
+    TileMap* map = Manager::GetGameObj<TileMap>();
+    Camera* camera = Manager::GetGameObj<Camera>();
+    const float x = m_Position.x, z = m_Position.z;
+
+    switch (m_Class)
+    {
+    case PlayerClass::Warrior:      // Whirlwind: full circle, radius 1.9, 2x attack and mining
+    {
+        if (monsters)
+            monsters->HitInArc(x, z, 0.0f, 1.9f, XM_2PI, RollDamage(m_Attack * 2.0f));
+        if (map)
         {
-            DebugUI::Log("You dug out %s. (%d blocks left)",
-                kOre[result.grade].name, map->GetBlocksLeft());
-            GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);  // Miner: 1.5x
+            int hits[32];
+            const int count = map->BlocksInArc(x, z, 0.0f, 1.9f, XM_2PI, hits, 32);
+            for (int k = 0; k < count; k++)
+                MineTile(hits[k] % TileMap::W, hits[k] / TileMap::W, m_MinePower * 2.0f);
         }
+        if (projectiles)
+            projectiles->AddRing(x, z, 1.9f, 0xfff3b0, 0.3f);
+        if (camera)
+            camera->Shake(Vector3(0.15f, 0.0f, 0.15f));
+        DebugUI::Log("Whirlwind!");
+        break;
+    }
+    case PlayerClass::Miner:        // Dynamite: thrown 3.4 tiles, radius 1.9, 3x attack and mining
+    {
+        const float angle = AimAngle(5.0f);
+        if (projectiles)
+            projectiles->ThrowBomb(x, z, x + cosf(angle) * 3.4f, z + sinf(angle) * 3.4f,
+                1.9f, RollDamage(m_Attack * 3.0f), m_MinePower * 3.0f);
+        DebugUI::Log("Dynamite!");
+        break;
+    }
+    case PlayerClass::Mage:         // Frost Nova: radius 3.5, 1x attack, freeze 2.5 s, mines blocks within 3
+    {
+        if (monsters)
+            monsters->HitInRadius(x, z, 3.5f, RollDamage(m_Attack), 5.0f, 2.5f);
+        for (int tz = (int)floorf(z - 3.0f); tz <= (int)floorf(z + 3.0f); tz++)
+            for (int tx = (int)floorf(x - 3.0f); tx <= (int)floorf(x + 3.0f); tx++)
+            {
+                const float dx = tx + 0.5f - x, dz = tz + 0.5f - z;
+                if (dx * dx + dz * dz <= 9.0f)
+                    MineTile(tx, tz, m_MinePower);
+            }
+        if (projectiles)
+            projectiles->AddRing(x, z, 3.5f, 0x6fdcea, 0.45f);
+        DebugUI::Log("Frost Nova!");
+        break;
+    }
+    default:                        // Rogue - Shadow Dash: 24 tiles/s for 0.17 s, invincible
+    {
+        m_DashAngle = AimAngle(4.0f);
+        m_DashTime = 0.17f;
+        m_DashId++;
+        m_DashDamage = RollDamage(m_Attack * 1.5f);     // one crit roll per dash
+        m_Invincible = std::max(m_Invincible, 0.4f);
+        DebugUI::Log("Shadow Dash!");
+        break;
+    }
+    }
+}
+
+// Mine one tile (does nothing if it is not a block). Used by swings, bolts, bombs and skills.
+void Player::MineTile(int x, int z, float power)
+{
+    TileMap* map = Manager::GetGameObj<TileMap>();
+    if (!map)
+        return;
+    const MineResult result = map->MineBlock(x, z, power, m_MineLevel);
+    if (!result.hit)
+        return;
+
+    if (result.tooHard)
+        DebugUI::Log("Too hard! %s needs mining Lv%d",
+            kOre[result.grade].name, kOre[result.grade].requiredLevel);
+    if (result.broken)
+    {
+        DebugUI::Log("You dug out %s. (%d blocks left)",
+            kOre[result.grade].name, map->GetBlocksLeft());
+        GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);  // Miner: 1.5x
     }
 }
 

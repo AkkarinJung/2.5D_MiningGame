@@ -11,6 +11,7 @@
 #include "Score.h"
 #include <random>
 #include "Monsters.h"
+#include "Projectiles.h"
 #include "Result.h"
 
 void Game::Init()
@@ -21,6 +22,7 @@ void Game::Init()
     player->SetPosition(map->GetStartPosition());
 
     Manager::AddGameObj<Monsters>();
+    Manager::AddGameObj<Projectiles>();
 
     Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
     level->SetPosition({ 20.0f, 20.0f, 0.0f });

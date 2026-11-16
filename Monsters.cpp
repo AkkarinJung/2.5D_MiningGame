@@ -514,6 +514,36 @@ void Monsters::UpdateBrute(Monster& m, const TileMap& map, float px, float pz, f
 
 // ---------------------------------------------------------------- combat
 
+// ---------------------------------------------------------------- combat
+
+// Apply one hit: damage, white flash, wake up, knockback away from (fromX, fromZ).
+// Dead monsters stay in the list until RemoveDead, so callers can keep iterating.
+bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float knock)
+{
+    if (m.hp <= 0.0f)
+        return false;
+    const MonsterDef& def = kMonster[(int)m.type];
+
+    m.hp -= (float)std::max(1, (int)roundf(damage));
+    m.flash = 0.1f;
+    m.awake = true;
+
+    const float dx = m.x - fromX, dz = m.z - fromZ;
+    const float dist = sqrtf(dx * dx + dz * dz);
+    if (dist > 0.0f)
+    {
+        m.knockX += dx / dist * knock * def.knockback;
+        m.knockZ += dz / dist * knock * def.knockback;
+    }
+
+    if (m.hp > 0.0f)
+        return false;
+    DebugUI::Log("You defeated the %s.", def.name);
+    if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)
+        DropPotion(m.x, m.z);           // 12% potion drop
+    return true;
+}
+
 int Monsters::HitInArc(float ox, float oz, float facing, float range, float arc, float damage)
 {
     int kills = 0;
@@ -526,26 +556,85 @@ int Monsters::HitInArc(float ox, float oz, float facing, float range, float arc,
             continue;
         if (dist >= 0.45f && AngleDiff(atan2f(dz, dx), facing) > arc * 0.5f + 0.25f)
             continue;   // outside the swing (anything closer than 0.45 always gets hit)
-
-        const int dealt = std::max(1, (int)roundf(damage));
-        m.hp -= dealt;
-        m.flash = 0.1f;
-        m.awake = true;
-        if (dist > 0.0f)
-        {
-            m.knockX += dx / dist * 3.0f * def.knockback;
-            m.knockZ += dz / dist * 3.0f * def.knockback;
-        }
-        if (m.hp <= 0.0f)
-        {
+        if (Damage(m, damage, ox, oz, 3.0f))
             kills++;
-            DebugUI::Log("You defeated the %s.", def.name);
-            if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)
-                DropPotion(m.x, m.z);           // 12% potion drop
+    }
+    RemoveDead();
+    return kills;
+}
+
+int Monsters::HitInRadius(float x, float z, float radius, float damage, float knock, float freeze)
+{
+    int kills = 0;
+    for (Monster& m : m_List)
+    {
+        const float dx = m.x - x, dz = m.z - z;
+        const float r = radius + kMonster[(int)m.type].radius;
+        if (dx * dx + dz * dz > r * r)
+            continue;
+        if (freeze > 0.0f)
+            m.frozen = freeze;
+        if (Damage(m, damage, x, z, knock))
+            kills++;
+    }
+    RemoveDead();
+    return kills;
+}
+
+bool Monsters::HitAtPoint(float x, float z, float extra, float damage, float fromX, float fromZ)
+{
+    for (Monster& m : m_List)
+    {
+        const float dx = m.x - x, dz = m.z - z;
+        const float r = kMonster[(int)m.type].radius + extra;
+        if (dx * dx + dz * dz < r * r)
+        {
+            Damage(m, damage, fromX, fromZ, 3.0f);
+            RemoveDead();
+            return true;
+        }
+    }
+    return false;
+}
+
+int Monsters::HitAlongDash(float x, float z, float damage, int dashId)
+{
+    int kills = 0;
+    for (Monster& m : m_List)
+    {
+        if (m.dashId == dashId)
+            continue;                   // each dash hits a monster only once
+        const float dx = m.x - x, dz = m.z - z;
+        const float r = 0.8f + kMonster[(int)m.type].radius;
+        if (dx * dx + dz * dz < r * r)
+        {
+            m.dashId = dashId;
+            if (Damage(m, damage, x, z, 4.0f))
+                kills++;
         }
     }
     RemoveDead();
     return kills;
+}
+
+// Nearest monster within reach that the player can see (for keyboard auto-aim).
+bool Monsters::FindTarget(float x, float z, float reach, float& angle) const
+{
+    const TileMap* map = Manager::GetGameObj<TileMap>();
+    float best = reach;
+    bool found = false;
+    for (const Monster& m : m_List)
+    {
+        const float dx = m.x - x, dz = m.z - z;
+        const float d = sqrtf(dx * dx + dz * dz);
+        if (d < best && (!map || ClearLine(*map, x, z, m.x, m.z)))
+        {
+            best = d;
+            angle = atan2f(dz, dx);
+            found = true;
+        }
+    }
+    return found;
 }
 
 void Monsters::RemoveDead()

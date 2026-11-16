@@ -27,6 +27,8 @@ struct Monster
     uint8_t state = 0;                  // brute: BruteWalk / BruteWindUp / BruteCharge / BruteRest
     float stateTimer = 0.0f;
     float chargeAngle = 0.0f;
+    float frozen = 0.0f;                // > 0: Frost Nova slow (30% speed)
+    int   dashId = -1;                  // last Shadow Dash that hit this monster
 };
 
 struct Potion
@@ -65,6 +67,7 @@ private:
     void Steer(const Monster& m, const TileMap& map, float px, float pz, float& sx, float& sz) const;
     void UpdateBrute(Monster& m, const TileMap& map, float px, float pz, float sx, float sz,
         float dt, float& vx, float& vz);
+    bool Damage(Monster& m, float damage, float fromX, float fromZ, float knock);
     void RemoveDead();
     int  Flow(int x, int z) const;
     MonsterType RandomType();
@@ -79,6 +82,14 @@ public:
 
     // Melee swing: damages every monster in the arc. Returns how many died.
     int HitInArc(float ox, float oz, float facing, float range, float arc, float damage);
+    // Explosion / nova: every monster touching the circle; optional freeze in seconds.
+    int HitInRadius(float x, float z, float radius, float damage, float knock, float freeze = 0.0f);
+    // Bolt: the first monster within (its radius + extra) of the point. True if one was hit.
+    bool HitAtPoint(float x, float z, float extra, float damage, float fromX, float fromZ);
+    // Shadow Dash: monsters near the dashing player, each hit once per dash.
+    int HitAlongDash(float x, float z, float damage, int dashId);
+    // Nearest visible monster within reach; writes its direction to angle.
+    bool FindTarget(float x, float z, float reach, float& angle) const;
 
     void DropPotion(float x, float z) { m_Potions.push_back({ x, z }); }
 

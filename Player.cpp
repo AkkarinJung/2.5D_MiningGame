@@ -290,8 +290,8 @@ void Player::UpdateGround()
     if (Input::GetKeyTrigger('Q'))
         DrinkPotion();
 
-    // Hold J or Space to swing; the cooldown sets the pace
-    if ((Input::GetKeyPress('J') || Input::GetKeyPress(VK_SPACE)) && m_AttackCooldown <= 0.0f)
+    // Hold J or Space to attack; the cooldown sets the pace
+    if ((Input::GetKeyPress('J') || Input::GetKeyPress(VK_SPACE)) && m_AttackCooldown <= 0.0f && m_DashTime <= 0.0f)
     {
         m_State = STATE_ATTACK;
         m_StateTime = 0.0f;
@@ -318,7 +318,7 @@ void Player::UpdateAttack()
 
 void Player::Draw()
 {
-    if (m_Invincible > 0.0f && !IsDead() && ((int)(m_Invincible * 14.0f) % 2) == 1)
+    if (m_Invincible > 0.0f && m_DashTime <= 0.0f && !IsDead() && ((int)(m_Invincible * 14.0f) % 2) == 1)
         return;
 
     // 入力レイアウト設定

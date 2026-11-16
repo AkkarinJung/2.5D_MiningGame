@@ -1,6 +1,5 @@
 // Monsters.cpp
-// Monster AI (wake/sleep, distance-map steering, slime hops, bat zigzag, goblin chase),
-// brute wind-up and charge), contact damage, melee hits from the player, spawning,
+// Monster AI (wake/sleep, distance-map steering, slime hops, bat zigzag, goblin chase,brute wind-up and charge), contact damage, melee hits from the player, spawning,
 // potions (floor loot, drops, pickup), and drawing everything as camera-facing
 // pixel-art billboards built from MonsterData.h, with HP bars over hurt monsters.
 
@@ -399,6 +398,7 @@ void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, flo
 {
     const MonsterDef& def = kMonster[(int)m.type];
     m.flash -= dt;
+    m.frozen -= dt;
 
     const float dx = px - m.x, dz = pz - m.z;
     const float d = sqrtf(dx * dx + dz * dz);
@@ -464,7 +464,8 @@ void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, flo
     }
 
     Vector3 pos(m.x, 0.0f, m.z);
-    Vector3 vel(vx + m.knockX, 0.0f, vz + m.knockZ);
+    const float slow = m.frozen > 0.0f ? 0.3f : 1.0f;      // Frost Nova: 30% speed
+    Vector3 vel(vx * slow + m.knockX, 0.0f, vz * slow + m.knockZ);
     map.MoveAndSlide(pos, vel, dt, def.radius);
     if (vel.x == 0.0f) m.knockX = 0.0f;
     if (vel.z == 0.0f) m.knockZ = 0.0f;
@@ -716,6 +717,8 @@ void Monsters::Draw()
 
         const float bright = (m.flash > 0.0f || flicker) ? 4.0f : 1.0f;     // hit flash
         material.Diffuse = XMFLOAT4(bright, bright, bright, 1.0f);
+        if (m.frozen > 0.0f && bright == 1.0f)
+            material.Diffuse = XMFLOAT4(0.55f, 1.3f, 1.6f, 1.0f);              // frozen: icy tint
         Renderer::SetMaterial(material);
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height * squash, 1.0f) *
             invView * XMMatrixTranslation(m.x + shakeX, y, m.z));

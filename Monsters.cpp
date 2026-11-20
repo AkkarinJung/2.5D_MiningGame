@@ -760,7 +760,7 @@ void Monsters::Draw()
         if (m.frozen > 0.0f && bright == 1.0f)
             material.Diffuse = XMFLOAT4(0.55f, 1.3f, 1.6f, 1.0f);              // frozen: icy tint
         else if (m.poison > 0.0f && bright == 1.0f)
-            material.Diffuse = XMFLOAT4(0.7f, 1.4f, 0.6f, 1.0f);               // poisoned: green tint           // frozen: icy tint
+            material.Diffuse = XMFLOAT4(0.7f, 1.4f, 0.6f, 1.0f);               // poisoned: green tint
         Renderer::SetMaterial(material);
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height * squash, 1.0f) *
             invView * XMMatrixTranslation(m.x + shakeX, y, m.z));

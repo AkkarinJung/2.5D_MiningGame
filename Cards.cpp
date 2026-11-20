@@ -4,6 +4,7 @@
 // The window uses Dear ImGui for now; the pixel-font game UI replaces it in M6.
 
 #include "main.h"
+#include "renderer.h"
 #include "manager.h"
 #include "input.h"
 #include "Cards.h"

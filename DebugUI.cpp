@@ -11,6 +11,7 @@
 #include "OreData.h"
 #include "Monsters.h"
 #include "ClassData.h"
+#include "Cards.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
@@ -255,6 +256,48 @@ void DebugUI::Draw()
                 }
             }
 
+
+            // ---- Cards
+            Cards* cards = Manager::GetGameObj<Cards>();
+            if (cards && player && ImGui::CollapsingHeader("Cards"))
+            {
+                ImGui::Text("Armor %d   crit %.0f%%   luck %.0f%%", player->GetArmor(),
+                    player->GetCrit() * 100.0f, player->GetLuck() * 100.0f);
+
+                bool any = false;
+                for (int i = 0; i < kCardCount; i++)
+                {
+                    const int owned = cards->Owned((CardId)i);
+                    if (owned <= 0)
+                        continue;
+                    const float* rc = kRarityColor[(int)kCard[i].rarity];
+                    ImGui::TextColored(ImVec4(rc[0], rc[1], rc[2], 1.0f), "%s x%d", kCard[i].name, owned);
+                    any = true;
+                }
+                if (!any)
+                    ImGui::TextDisabled("No cards yet. Each mining level-up lets you pick one.");
+
+                static int addIndex = 0;
+                ImGui::SetNextItemWidth(180.0f);
+                if (ImGui::BeginCombo("##addcard", kCard[addIndex].name))
+                {
+                    for (int i = 0; i < kCardCount; i++)
+                        if (ImGui::Selectable(kCard[i].name, i == addIndex))
+                            addIndex = i;
+                    ImGui::EndCombo();
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Add card"))
+                {
+                    cards->Grant((CardId)addIndex);
+                    Log("[debug] added card %s", kCard[addIndex].name);
+                }
+                if (ImGui::Button("Force a level-up pick"))
+                {
+                    player->GainMiningXp((float)MiningXpToNext(player->GetMineLevel()) - player->GetMineXp(), 3);
+                    Log("[debug] forced a level-up (crystal odds)");
+                }
+            }
 
             // ---- Render
             if (ImGui::CollapsingHeader("Render"))

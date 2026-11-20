@@ -15,12 +15,21 @@ struct Bolt
     float damage, mine;
 };
 
+struct Wave             // Sword Wave: pierces monsters, stops at walls and blocks
+{
+    float x, z, vx, vz;
+    float life;
+    float damage, mine;
+    int   hitId;
+};
+
 struct Bomb
 {
     float startX, startZ, targetX, targetZ;
     float x, z, y;
     float t, duration;
     float radius, damage, mine;
+    bool  visible;      // false: a delayed explosion (Chain Blast), nothing is drawn
 };
 
 struct Ring
@@ -34,6 +43,7 @@ class Projectiles : public GameObject
 {
 private:
     std::vector<Bolt> m_Bolts;
+    std::vector<Wave> m_Waves;
     std::vector<Bomb> m_Bombs;
     std::vector<Ring> m_Rings;
     float m_Time = 0.0f;
@@ -61,7 +71,11 @@ public:
     void ThrowBomb(float x, float z, float targetX, float targetZ, float radius, float damage, float mine);
     // Visual only: a ring that grows to radius and fades out.
     void AddRing(float x, float z, float radius, uint32_t rgb, float life = 0.4f);
+    // Warrior Sword Wave: 9 tiles/s for 0.5 s, pierces every monster once.
+    void FireWave(float x, float z, float angle, float damage, float mine);
+    // Chain Blast: an explosion at (x, z) after delay seconds.
+    void QueueExplosion(float x, float z, float delay, float radius, float damage, float mine);
 
-    int Count() const { return (int)(m_Bolts.size() + m_Bombs.size()); }
+    int Count() const { return (int)(m_Bolts.size() + m_Waves.size() + m_Bombs.size()); }
 };
 

@@ -14,6 +14,8 @@
 #include "Enemy.h"
 #include "Monsters.h"
 #include "Projectiles.h"
+#include "Cards.h"
+#include "GameState.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -88,6 +90,8 @@ void Player::Uninit()
 
 void Player::Update()
 {
+    if (GamePaused())
+        return;     // card pick open: freeze in place
 
     Vector3 oldPosition = m_Position;
     float dt = 1.0 / 60.0f;
@@ -107,6 +111,13 @@ void Player::Update()
     m_AttackCooldown -= dt;
     m_Invincible -= dt;
     m_SkillTimer -= dt;
+
+    if (m_TwinTimer > 0.0f)
+    {
+        m_TwinTimer -= dt;
+        if (m_TwinTimer <= 0.0f && !IsDead())
+            DoAttack();             // Twin Strike: the second attack, 0.1 s later
+    }
 
     Vector3 rot = m_Child->GetRotation();
     rot.y += 1.0f * dt;
@@ -312,7 +323,7 @@ void Player::UpdateAttack()
     SetAnimation("Attack");
 
     m_StateTime += dt;
-    if (m_StateTime >= m_AttackRate)
+    if (m_StateTime >= m_AttackRate / m_AttackSpeed)
         m_State = STATE_GROUND;
 }
 
@@ -367,31 +378,58 @@ float Player::AimAngle(float reach)
     return angle;
 }
 
-// One attack: the Mage fires a bolt; everyone else swings at monsters and blocks in the arc.
+float Player::Arc() const
+{
+    // Broad Blade widens the swing a little too, up to 1.4 pi
+    return std::min(XM_PI * 1.4f, m_AttackArc * (1.0f + (m_Area - 1.0f) * 0.6f));
+}
+
+// One attack, plus a Twin Strike roll for a second one 0.1 s later.
 void Player::Attack()
 {
+    DoAttack();
+    static std::mt19937 rng(std::random_device{}());
+    if (m_Twin > 0.0f && std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < m_Twin)
+        m_TwinTimer = 0.1f;
+}
+
+// The Mage fires a bolt (three with Split Bolt); everyone else swings at monsters and
+// blocks in the arc (and launches a slash wave with Sword Wave).
+void Player::DoAttack()
+{
     const ClassDef& cls = kClass[(int)m_Class];
+    Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
 
     if (cls.ranged)
     {
         const float angle = AimAngle(7.0f);
-        Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
         if (projectiles)
+        {
             projectiles->FireBolt(m_Position.x, m_Position.z, angle, RollDamage(m_Attack), m_MinePower);
+            if (m_SplitBolt)
+            {
+                projectiles->FireBolt(m_Position.x, m_Position.z, angle - 0.28f, RollDamage(m_Attack), m_MinePower);
+                projectiles->FireBolt(m_Position.x, m_Position.z, angle + 0.28f, RollDamage(m_Attack), m_MinePower);
+            }
+        }
         return;
     }
 
-    const float facing = AimAngle(m_AttackRange + 1.3f);
+    const float facing = AimAngle(Reach() + 1.3f);
 
     Monsters* monsters = Manager::GetGameObj<Monsters>();
     if (monsters)
-        monsters->HitInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, RollDamage(m_Attack));
+        monsters->HitInArc(m_Position.x, m_Position.z, facing, Reach(), Arc(), RollDamage(m_Attack));
+
+    if (m_SwordWave && projectiles)
+        projectiles->FireWave(m_Position.x, m_Position.z, facing,
+            RollDamage(ceilf(m_Attack * 0.7f)), m_MinePower * 0.5f);
 
     TileMap* map = Manager::GetGameObj<TileMap>();
     if (!map)
         return;
     int hits[16];
-    const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing, m_AttackRange, m_AttackArc, hits, 16);
+    const int count = map->BlocksInArc(m_Position.x, m_Position.z, facing, Reach(), Arc(), hits, 16);
     for (int k = 0; k < count; k++)
         MineTile(hits[k] % TileMap::W, hits[k] / TileMap::W, m_MinePower);
 }
@@ -402,8 +440,7 @@ void Player::UseSkill()
     if (IsDead())
         return;
 
-    const ClassDef& cls = kClass[(int)m_Class];
-    m_SkillTimer = cls.skillCooldown;
+    m_SkillTimer = GetSkillCooldown();      // Focus shortens it
 
     Monsters* monsters = Manager::GetGameObj<Monsters>();
     Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
@@ -460,7 +497,7 @@ void Player::UseSkill()
     {
         m_DashAngle = AimAngle(4.0f);
         m_DashTime = 0.17f;
-        m_DashId++;
+        m_DashId = monsters ? monsters->NewHitId() : m_DashId + 1;   // ids shared with Sword Wave
         m_DashDamage = RollDamage(m_Attack * 1.5f);     // one crit roll per dash
         m_Invincible = std::max(m_Invincible, 0.4f);
         DebugUI::Log("Shadow Dash!");
@@ -487,12 +524,26 @@ void Player::MineTile(int x, int z, float power)
         DebugUI::Log("You dug out %s. (%d blocks left)",
             kOre[result.grade].name, map->GetBlocksLeft());
         GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);  // Miner: 1.5x
+
+        const float bx = x + 0.5f, bz = z + 0.5f;
+        Projectiles* projectiles = Manager::GetGameObj<Projectiles>();
+        if (m_Aftershock > 0.0f)            // Aftershock: hurt monsters around the broken block
+        {
+            Monsters* monsters = Manager::GetGameObj<Monsters>();
+            if (monsters)
+                monsters->HitInRadius(bx, bz, 2.0f, m_Aftershock, 4.0f, 0.0f, false);
+            if (projectiles)
+                projectiles->AddRing(bx, bz, 2.2f, 0xffb35a);
+        }
+        if (m_ChainBlast && projectiles)    // Chain Blast: the block explodes 0.18 s later
+            projectiles->QueueExplosion(bx, bz, 0.18f, 1.7f, m_Attack * 2.0f, m_MinePower * 1.5f);
     }
 }
 
 // Mining XP: each level needs 8 + 7 per level and gives +1 mining power.
-void Player::GainMiningXp(float xp)
+void Player::GainMiningXp(float xp, int oreGrade)
 {
+    Cards* cards = Manager::GetGameObj<Cards>();
     m_MineXp += xp;
     while (m_MineXp >= (float)MiningXpToNext(m_MineLevel))
     {
@@ -501,7 +552,8 @@ void Player::GainMiningXp(float xp)
         m_MinePower += 1.0f;
 
         DebugUI::Log("Mining Lv%d! (power %.0f)", m_MineLevel, m_MinePower);
-        // M5: queue a card pick here, tagged with this ore grade
+        if (cards)
+            cards->QueueLevelUp(oreGrade, m_MineLevel);     // card pick, odds from this ore
     }
 
     Score* level = Manager::GetGameObj<Score>();
@@ -510,10 +562,10 @@ void Player::GainMiningXp(float xp)
 }
 
 // Contact damage from a monster: armor, minimum 1, 0.6 s invincibility, knockback away.
-void Player::TakeDamage(int amount, float fromX, float fromZ, const char* source)
+bool Player::TakeDamage(int amount, float fromX, float fromZ, const char* source)
 {
     if (m_Invincible > 0.0f || IsDead() || m_GodMode)
-        return;
+        return false;
 
     const int damage = std::max(1, amount - m_Armor);
     m_Hp -= damage;
@@ -534,6 +586,57 @@ void Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
     DebugUI::Log("The %s hits you for %d. (HP %d/%d)", source, damage, std::max(0, m_Hp), m_MaxHp);
     if (IsDead())
         DebugUI::Log("Slain by the %s...", source);
+    return true;
+}
+
+// Leech: heal on every kill.
+void Player::OnKill()
+{
+    if (m_Leech > 0 && !IsDead() && m_Hp < m_MaxHp)
+    {
+        const int heal = std::min(m_Leech, m_MaxHp - m_Hp);
+        m_Hp += heal;
+        DebugUI::Log("Leech +%d HP", heal);
+    }
+}
+
+// One card's effect. Cards.cpp handles the deck; this only changes the player's numbers.
+void Player::ApplyCard(CardId id)
+{
+    switch (id)
+    {
+    case CardId::HeavyArm:    m_Attack += 1.0f; break;
+    case CardId::SharpPick:   m_MinePower += 2.0f; break;
+    case CardId::ToughHide:   m_MaxHp += 6; m_Hp = std::min(m_MaxHp, m_Hp + 6); break;
+    case CardId::FleetFoot:   m_Speed *= 1.12f; break;
+    case CardId::QuickHands:  m_AttackSpeed += 0.15f; break;
+    case CardId::PotionPouch: m_Potions += 2; break;
+    case CardId::SecondWind:  m_Hp = m_MaxHp; break;
+    case CardId::IronSkin:    m_Armor += 1; break;
+    case CardId::Leech:       m_Leech += 2; break;
+    case CardId::KeenEdge:    m_Crit += 0.15f; break;
+    case CardId::Thorns:      m_Thorns += 4; break;
+    case CardId::BroadBlade:  m_Area += 0.2f; break;
+    case CardId::Focus:       m_CooldownScale *= 0.8f; break;
+    case CardId::Prospector:  m_Luck += 0.12f; break;
+    case CardId::BigBomb:     m_Blast *= 1.4f; break;
+    case CardId::TwinStrike:  m_Twin += 0.3f; break;
+    case CardId::Aftershock:  m_Aftershock += 8.0f; break;
+    case CardId::Executioner: m_Executioner = true; break;
+    case CardId::Motherlode:
+    {
+        m_Motherlode = true;
+        TileMap* map = Manager::GetGameObj<TileMap>();
+        if (map)
+            map->SetMotherlode(true);   // takes effect when the next floor is generated
+        break;
+    }
+    case CardId::SwordWave:   m_SwordWave = true; break;
+    case CardId::ChainBlast:  m_ChainBlast = true; break;
+    case CardId::SplitBolt:   m_SplitBolt = true; break;
+    case CardId::VenomBlade:  m_Venom = true; break;
+    default: break;
+    }
 }
 
 // Q: drink a potion, healing 40% of max HP (rounded up, never above max).

@@ -337,13 +337,18 @@ void TileMap::PlaceOre(uint32_t seed, int floorNo)
     auto takeAt = [&](size_t k) { const int i = open[k]; open[k] = open.back(); open.pop_back(); return i; };
 
     const float f = (float)floorNo;
-    const float weights[kOreCount] =
+    float weights[kOreCount] =
     {
         std::max(14.0f, 62.0f - 6.0f * f),   // copper
         22.0f + 2.0f * f,                    // silver
         8.0f + 2.5f * f,                     // gold
         3.0f + 1.6f * f,                     // crystal
     };
+    if (m_Motherlode)
+    {
+        weights[2] += 18.0f;                 // Motherlode card
+        weights[3] += 14.0f;
+    }
     const float total = weights[0] + weights[1] + weights[2] + weights[3];
 
     const int veins = 12 + std::min(6, floorNo);

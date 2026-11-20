@@ -23,6 +23,7 @@
     <ClCompile Include="audio.cpp" />
     <ClCompile Include="Box.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Cards.cpp" />
     <ClCompile Include="ClassSelect.cpp" />
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DebugUI.cpp" />
@@ -61,6 +62,8 @@
     <ClInclude Include="audio.h" />
     <ClInclude Include="Box.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="Cards.h" />
+    <ClInclude Include="CardData.h" />
     <ClInclude Include="ClassData.h" />
     <ClInclude Include="ClassSelect.h" />
     <ClInclude Include="Collision.h" />
@@ -73,6 +76,7 @@
     <ClInclude Include="field.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GameObject.h" />
+    <ClInclude Include="GameState.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_dx11.h" />

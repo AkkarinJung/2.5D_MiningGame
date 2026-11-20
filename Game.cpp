@@ -13,6 +13,8 @@
 #include "Monsters.h"
 #include "Projectiles.h"
 #include "Result.h"
+#include "Cards.h"
+#include "GameState.h"
 
 void Game::Init()
 {
@@ -23,6 +25,7 @@ void Game::Init()
 
     Manager::AddGameObj<Monsters>();
     Manager::AddGameObj<Projectiles>();
+    Manager::AddGameObj<Cards>();      // after Player, so a level-up opens its pick the same frame
 
     Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
     level->SetPosition({ 20.0f, 20.0f, 0.0f });
@@ -44,6 +47,9 @@ void Game::Update()
         Manager::ChangeScene<Result>(1.5f);     // death screen comes in M6
         return;
     }
+    if (GamePaused())
+        return;                                 // card pick open
+
     // G: brand-new random floor (for testing until the F1 debug panel exists)
     if (Input::GetKeyTrigger('G'))
     {

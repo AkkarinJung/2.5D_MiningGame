@@ -76,9 +76,30 @@ private:
     int   m_DashId = 0;
     float m_DashDamage = 0.0f;
 
-    void Attack();                  // melee swing or Mage bolt
+    // Card modifiers (M5 step 3), changed only by ApplyCard
+    float m_AttackSpeed = 1.0f;     // Quick Hands
+    float m_Area = 1.0f;            // Broad Blade: reach x area
+    float m_CooldownScale = 1.0f;   // Focus
+    float m_Luck = 0.0f;            // Prospector
+    float m_Twin = 0.0f;            // Twin Strike chance
+    float m_TwinTimer = 0.0f;       // > 0: second attack fires when it runs out
+    int   m_Leech = 0;              // HP per kill
+    int   m_Thorns = 0;             // damage back on contact
+    float m_Aftershock = 0.0f;      // damage around broken blocks
+    float m_Blast = 1.0f;           // Big Bomb radius scale
+    bool  m_Executioner = false;
+    bool  m_Motherlode = false;
+    bool  m_SwordWave = false;
+    bool  m_ChainBlast = false;
+    bool  m_SplitBolt = false;
+    bool  m_Venom = false;
+
+    void Attack();                  // DoAttack + Twin Strike roll
+    void DoAttack();                // melee swing or Mage bolt(s)
     void UseSkill();
     float AimAngle(float reach);    // nearest visible monster in reach, else facing
+    float Reach() const { return m_AttackRange * m_Area; }
+    float Arc() const;
     float RollDamage(float base);   // crit: double damage
 
 
@@ -92,12 +113,12 @@ public:
     void UpdateAttack();
 
     void SetAnimation(const char* AnimationName);
-    void GainMiningXp(float xp);
+    void GainMiningXp(float xp, int oreGrade = 0);  // level-ups queue a card pick for this grade
     int GetMineLevel() const { return m_MineLevel; }
     float GetMineXp() const { return m_MineXp; }
     float GetMinePower() const { return m_MinePower; }
 
-    void TakeDamage(int amount, float fromX, float fromZ, const char* source);
+    bool TakeDamage(int amount, float fromX, float fromZ, const char* source);// true if it hurt
     void HealFull() { m_Hp = m_MaxHp; }
     int  GetHp() const { return m_Hp; }
     int  GetMaxHp() const { return m_MaxHp; }
@@ -113,5 +134,15 @@ public:
     void MineTile(int x, int z, float power);
     float GetSkillTimer() const { return m_SkillTimer; }
     float GetSkillCooldown() const { return kClass[(int)m_Class].skillCooldown; }
+
+    // Cards
+    void ApplyCard(CardId id);
+    void OnKill();                  // Leech
+    float GetLuck() const { return m_Luck; }
+    int  GetThorns() const { return m_Thorns; }
+    int  GetArmor() const { return m_Armor; }
+    float GetCrit() const { return m_Crit; }
+    bool IsExecutioner() const { return m_Executioner; }
+    bool HasVenom() const { return m_Venom; }
 };
 

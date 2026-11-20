@@ -33,6 +33,7 @@ private:
     std::vector<float>   m_BlockHp;
     std::vector<float>   m_BlockDamage;
     int m_BlocksLeft = 0;
+    bool m_Motherlode = false;          // card: more gold and crystal on later floors
 
     uint32_t m_Seed = 0;
     int m_FloorNo = 1;
@@ -86,6 +87,8 @@ public:
     int GetFloor() const { return m_FloorNo; }
     int GetDrawnWalls() const { return m_DrawnWalls; }
     int GetBlocksLeft() const { return m_BlocksLeft; }
+    void SetMotherlode(bool on) { m_Motherlode = on; }
+    bool HasMotherlode() const { return m_Motherlode; }
     int GetStartDistance(int x, int z) const     // steps from the start tile, -1 = unreachable
     {
         return (x < 0 || z < 0 || x >= W || z >= H) ? -1 : m_Dist[z * W + x];

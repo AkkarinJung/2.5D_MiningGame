@@ -12,6 +12,7 @@
 #include "Monsters.h"
 #include "Projectiles.h"
 #include "SpriteAtlas.h"
+#include "GameState.h"
 #include <cmath>
 #include <algorithm>
 
@@ -46,6 +47,7 @@ void Projectiles::Init()
 {
     m_Layer = 1;
     m_Bolts.reserve(32);
+    m_Waves.reserve(16);
     m_Bombs.reserve(8);
     m_Rings.reserve(16);
 
@@ -144,7 +146,30 @@ void Projectiles::ThrowBomb(float x, float z, float targetX, float targetZ, floa
     b.radius = radius;
     b.damage = damage;
     b.mine = mine;
+    b.visible = true;
     m_Bombs.push_back(b);
+}
+
+void Projectiles::QueueExplosion(float x, float z, float delay, float radius, float damage, float mine)
+{
+    ThrowBomb(x, z, x, z, radius, damage, mine);
+    m_Bombs.back().duration = delay;
+    m_Bombs.back().visible = false;
+}
+
+void Projectiles::FireWave(float x, float z, float angle, float damage, float mine)
+{
+    Monsters* monsters = Manager::GetGameObj<Monsters>();
+    Wave w;
+    w.x = x;
+    w.z = z;
+    w.vx = cosf(angle) * 9.0f;
+    w.vz = sinf(angle) * 9.0f;
+    w.life = 0.5f;
+    w.damage = damage;
+    w.mine = mine;
+    w.hitId = monsters ? monsters->NewHitId() : 0;
+    m_Waves.push_back(w);
 }
 
 void Projectiles::AddRing(float x, float z, float radius, uint32_t rgb, float life)
@@ -197,6 +222,8 @@ void Projectiles::Update()
         return;
 
     const float dt = 1.0f / 60.0f;
+    if (GamePaused())
+        return;                     // card pick open
     m_Time += dt;
 
     // Bolts: 3 substeps per tick so they never skip through a one-tile wall
@@ -231,6 +258,36 @@ void Projectiles::Update()
         else
             i++;
     }
+
+    // Sword waves: like bolts, but they pierce monsters (each hit once)
+    for (size_t i = 0; i < m_Waves.size();)
+    {
+        Wave& w = m_Waves[i];
+        w.life -= dt;
+        bool dead = w.life <= 0.0f;
+        for (int s = 0; s < 3 && !dead; s++)
+        {
+            const float nx = w.x + w.vx * dt / 3.0f, nz = w.z + w.vz * dt / 3.0f;
+            const int tx = (int)floorf(nx), tz = (int)floorf(nz);
+            const Tile t = map->Get(tx, tz);
+            if (t == Tile::Wall || t == Tile::Block)
+            {
+                if (t == Tile::Block && player)
+                    player->MineTile(tx, tz, w.mine);
+                dead = true;
+                break;
+            }
+            w.x = nx;
+            w.z = nz;
+            if (monsters)
+                monsters->HitOnce(w.x, w.z, 0.2f, w.damage, w.hitId, 3.0f);
+        }
+        if (dead)
+            SwapRemove(m_Waves, i);
+        else
+            i++;
+    }
+
 
     // Bombs: fly along an arc, stop short of walls, explode on landing
     for (size_t i = 0; i < m_Bombs.size();)
@@ -306,6 +363,19 @@ void Projectiles::Draw()
             XMMatrixTranslation(b.x, 0.35f, b.z));
         ctx->Draw(4, 0);
     }
+
+    // Sword waves: the bolt sprite, stretched and tinted pale gold
+    material.Diffuse = XMFLOAT4(1.0f, 0.95f, 0.6f, 1.0f);
+    Renderer::SetMaterial(material);
+    for (const Wave& w : m_Waves)
+    {
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.9f, 0.35f, 1.0f) * invView *
+            XMMatrixTranslation(w.x, 0.25f, w.z));
+        ctx->Draw(4, 0);
+    }
+    material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    Renderer::SetMaterial(material);
+
     ctx->IASetVertexBuffers(0, 1, &m_BombVB, &stride, &offset);
     for (const Bomb& b : m_Bombs)
     {

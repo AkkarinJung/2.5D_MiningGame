@@ -189,6 +189,7 @@ void Player::Update()
         }
     }
 
+
     auto boxes = Manager::GetGameObjs<Box>();
     for (auto box : boxes)
     {
@@ -523,6 +524,7 @@ void Player::MineTile(int x, int z, float power)
     {
         DebugUI::Log("You dug out %s. (%d blocks left)",
             kOre[result.grade].name, map->GetBlocksLeft());
+        m_BlocksBroken++;
         GainMiningXp(kOre[result.grade].xp * m_MiningXpScale, result.grade);  // Miner: 1.5x
 
         const float bx = x + 0.5f, bz = z + 0.5f;
@@ -585,13 +587,17 @@ bool Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
 
     DebugUI::Log("The %s hits you for %d. (HP %d/%d)", source, damage, std::max(0, m_Hp), m_MaxHp);
     if (IsDead())
+    {
+        m_KilledBy = source;
         DebugUI::Log("Slain by the %s...", source);
+    }
     return true;
 }
 
 // Leech: heal on every kill.
 void Player::OnKill()
 {
+    m_Kills++;
     if (m_Leech > 0 && !IsDead() && m_Hp < m_MaxHp)
     {
         const int heal = std::min(m_Leech, m_MaxHp - m_Hp);

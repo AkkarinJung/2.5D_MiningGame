@@ -14,6 +14,7 @@
 #include "Projectiles.h"
 #include "Result.h"
 #include "Cards.h"
+#include "Prompts.h"
 #include "GameState.h"
 
 void Game::Init()
@@ -26,6 +27,7 @@ void Game::Init()
     Manager::AddGameObj<Monsters>();
     Manager::AddGameObj<Projectiles>();
     Manager::AddGameObj<Cards>();      // after Player, so a level-up opens its pick the same frame
+    Manager::AddGameObj<Prompts>();    // stairs, restart (R) and death screen
 
     Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
     level->SetPosition({ 20.0f, 20.0f, 0.0f });
@@ -42,13 +44,8 @@ void Game::Update()
     Player* player = Manager::GetGameObj<Player>();
     if (!map || !player)
         return;
-    if (player->IsDead())
-    {
-        Manager::ChangeScene<Result>(1.5f);     // death screen comes in M6
-        return;
-    }
-    if (GamePaused())
-        return;                                 // card pick open
+    if (player->IsDead() || GamePaused())
+        return;                                 // death screen, card pick or prompt open
 
     // G: brand-new random floor (for testing until the F1 debug panel exists)
     if (Input::GetKeyTrigger('G'))
@@ -56,13 +53,7 @@ void Game::Update()
         map->Generate(std::random_device{}(), 1);
         player->SetPosition(map->GetStartPosition());
     }
-
-    // Stepping on the stairs builds the next floor (the stay/descend prompt comes in M6)
-    if (map->IsStairs(player->GetPosition()))
-    {
-        map->Generate(map->GetSeed(), map->GetFloor() + 1);
-        player->SetPosition(map->GetStartPosition());
-    }
+    // The stairs are handled by Prompts (stay or descend)
 }
 
 void Game::Draw() {}

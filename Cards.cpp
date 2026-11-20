@@ -21,7 +21,7 @@ void Cards::Init()
     m_Layer = 4;
     m_Rng.seed(std::random_device{}());
     m_Pending.reserve(8);
-    GamePaused() = false;
+    CardPickOpen() = false;
 }
 
 void Cards::OddsFor(int oreGrade, float out[3]) const
@@ -129,7 +129,7 @@ void Cards::Choose(int slot)
 
 void Cards::Update()
 {
-    GamePaused() = !m_Pending.empty();
+    CardPickOpen() = !m_Pending.empty();
     if (m_Pending.empty())
         return;
 

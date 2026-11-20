@@ -38,6 +38,13 @@ public:
     void Grant(CardId id);              // apply a card and add it to the deck (also used by the debug panel)
 
     int  Owned(CardId id) const { return m_Deck[(int)id]; }
+    int  TotalOwned() const
+    {
+        int n = 0;
+        for (int c : m_Deck)
+            n += c;
+        return n;
+    }
     bool IsPicking() const { return !m_Pending.empty(); }
 
     // Rarity odds (common, rare, epic) for a level-up caused by this ore grade.

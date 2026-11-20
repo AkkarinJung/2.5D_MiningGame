@@ -95,6 +95,11 @@ private:
     bool  m_SplitBolt = false;
     bool  m_Venom = false;
 
+    // Run stats for the death screen (M6)
+    int   m_Kills = 0;
+    int   m_BlocksBroken = 0;
+    const char* m_KilledBy = "";
+
     void Attack();                  // DoAttack + Twin Strike roll
     void DoAttack();                // melee swing or Mage bolt(s)
     void UseSkill();
@@ -145,5 +150,11 @@ public:
     float GetCrit() const { return m_Crit; }
     bool IsExecutioner() const { return m_Executioner; }
     bool HasVenom() const { return m_Venom; }
+
+    // Run stats / floors
+    void Heal(int amount) { m_Hp = std::min(m_MaxHp, m_Hp + amount); }
+    int  GetKills() const { return m_Kills; }
+    int  GetBlocksBroken() const { return m_BlocksBroken; }
+    const char* GetKilledBy() const { return m_KilledBy; }
 };
 

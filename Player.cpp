@@ -306,7 +306,7 @@ void Player::UpdateGround()
     {
         m_State = STATE_ATTACK;
         m_StateTime = 0.0f;
-        m_AttackCooldown = m_AttackRate;
+        m_AttackCooldown = m_AttackRate / m_AttackSpeed;   // Quick Hands
         Attack();
     }
 
@@ -453,16 +453,16 @@ void Player::UseSkill()
     case PlayerClass::Warrior:      // Whirlwind: full circle, radius 1.9, 2x attack and mining
     {
         if (monsters)
-            monsters->HitInArc(x, z, 0.0f, 1.9f, XM_2PI, RollDamage(m_Attack * 2.0f));
+            monsters->HitInArc(x, z, 0.0f, 1.9f * m_Area, XM_2PI, RollDamage(m_Attack * 2.0f));
         if (map)
         {
             int hits[32];
-            const int count = map->BlocksInArc(x, z, 0.0f, 1.9f, XM_2PI, hits, 32);
+            const int count = map->BlocksInArc(x, z, 0.0f, 1.9f * m_Area, XM_2PI, hits, 32);
             for (int k = 0; k < count; k++)
                 MineTile(hits[k] % TileMap::W, hits[k] / TileMap::W, m_MinePower * 2.0f);
         }
         if (projectiles)
-            projectiles->AddRing(x, z, 1.9f, 0xfff3b0, 0.3f);
+            projectiles->AddRing(x, z, 1.9f * m_Area, 0xfff3b0, 0.3f);
         if (camera)
             camera->Shake(Vector3(0.15f, 0.0f, 0.15f));
         DebugUI::Log("Whirlwind!");
@@ -473,7 +473,7 @@ void Player::UseSkill()
         const float angle = AimAngle(5.0f);
         if (projectiles)
             projectiles->ThrowBomb(x, z, x + cosf(angle) * 3.4f, z + sinf(angle) * 3.4f,
-                1.9f, RollDamage(m_Attack * 3.0f), m_MinePower * 3.0f);
+                1.9f * m_Blast, RollDamage(m_Attack * 3.0f), m_MinePower * 3.0f);   // Big Bomb: x1.4 radius
         DebugUI::Log("Dynamite!");
         break;
     }
@@ -523,7 +523,7 @@ void Player::MineTile(int x, int z, float power)
     {
         DebugUI::Log("You dug out %s. (%d blocks left)",
             kOre[result.grade].name, map->GetBlocksLeft());
-        GainMiningXp(kOre[result.grade].xp * m_MiningXpScale);  // Miner: 1.5x
+        GainMiningXp(kOre[result.grade].xp * m_MiningXpScale, result.grade);  // Miner: 1.5x
 
         const float bx = x + 0.5f, bz = z + 0.5f;
         Projectiles* projectiles = Manager::GetGameObj<Projectiles>();

@@ -329,7 +329,7 @@ void Projectiles::Update()
 void Projectiles::Draw()
 {
     Camera* camera = Manager::GetGameObj<Camera>();
-    if (!camera || (m_Bolts.empty() && m_Bombs.empty() && m_Rings.empty()))
+    if (!camera || (m_Bolts.empty() && m_Waves.empty() && m_Bombs.empty() && m_Rings.empty()))
         return;
 
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
@@ -379,6 +379,8 @@ void Projectiles::Draw()
     ctx->IASetVertexBuffers(0, 1, &m_BombVB, &stride, &offset);
     for (const Bomb& b : m_Bombs)
     {
+        if (!b.visible)
+            continue;
         Renderer::SetWorldMatrix(XMMatrixScaling(0.5f, 0.5f, 1.0f) * XMMatrixRotationZ(m_Time * 12.0f) *
             invView * XMMatrixTranslation(b.x, b.y, b.z));
         ctx->Draw(4, 0);

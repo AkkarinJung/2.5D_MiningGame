@@ -3,6 +3,7 @@
 #include "GameObject.h"
 #include "animationModel.h"
 #include "ClassData.h"
+#include "CardData.h"
 
 class Player : public GameObject
 {
@@ -133,7 +134,7 @@ public:
     // Mine the block on (x, z) with this power; handles "too hard", logging and XP.
     void MineTile(int x, int z, float power);
     float GetSkillTimer() const { return m_SkillTimer; }
-    float GetSkillCooldown() const { return kClass[(int)m_Class].skillCooldown; }
+    float GetSkillCooldown() const { return kClass[(int)m_Class].skillCooldown * m_CooldownScale; }
 
     // Cards
     void ApplyCard(CardId id);

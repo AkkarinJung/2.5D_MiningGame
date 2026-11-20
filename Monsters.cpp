@@ -10,6 +10,7 @@
 #include "Player.h"
 #include "TileMap.h"
 #include "Monsters.h"
+#include "GameState.h"
 #include "DebugUI.h"
 #include <cmath>
 #include <algorithm>
@@ -302,6 +303,8 @@ void Monsters::Update()
         return;
 
     const float dt = 1.0f / 60.0f;
+    if (GamePaused())
+        return;                     // card pick open
     m_Time += dt;
 
     // A new floor was generated (stairs, G key or debug panel): repopulate it.
@@ -326,6 +329,7 @@ void Monsters::Update()
 
     for (Monster& m : m_List)
         UpdateOne(m, *map, p.x, p.z, dt);
+    RemoveDead();                   // poison can kill
 
     // Push overlapping monsters apart, half the overlap each (through MoveAndSlide, never into walls).
     for (size_t a = 0; a < m_List.size(); a++)
@@ -347,14 +351,17 @@ void Monsters::Update()
             mb.x = pb.x; mb.z = pb.z;
         }
 
-    // Contact damage (the player handles armor, invincibility and knockback)
-    for (const Monster& m : m_List)
+    // Contact damage (the player handles armor, invincibility and knockback); Thorns hits back
+    for (Monster& m : m_List)
     {
         const float dx = p.x - m.x, dz = p.z - m.z;
         const float r = kPlayerRadius + kMonster[(int)m.type].radius;
-        if (dx * dx + dz * dz < r * r)
-            player->TakeDamage(m.attack, m.x, m.z, kMonster[(int)m.type].name);
+        if (dx * dx + dz * dz < r * r &&
+            player->TakeDamage(m.attack, m.x, m.z, kMonster[(int)m.type].name) &&
+            player->GetThorns() > 0)
+            Damage(m, (float)player->GetThorns(), p.x, p.z, 3.0f, false);
     }
+    RemoveDead();
 
     // Potion pickup
     for (size_t i = 0; i < m_Potions.size();)
@@ -397,8 +404,23 @@ void Monsters::Update()
 void Monsters::UpdateOne(Monster& m, const TileMap& map, float px, float pz, float dt)
 {
     const MonsterDef& def = kMonster[(int)m.type];
+    if (m.hp <= 0.0f)
+        return;
     m.flash -= dt;
     m.frozen -= dt;
+
+    // Venom Blade: 1 + floor/2 damage every 0.5 s while poisoned
+    if (m.poison > 0.0f)
+    {
+        m.poison -= dt;
+        m.poisonTick += dt;
+        if (m.poisonTick >= 0.5f)
+        {
+            m.poisonTick = 0.0f;
+            if (Damage(m, (float)(1 + m_FloorNo / 2), m.x, m.z, 0.0f, false))
+                return;
+        }
+    }
 
     const float dx = px - m.x, dz = pz - m.z;
     const float d = sqrtf(dx * dx + dz * dz);
@@ -519,13 +541,29 @@ void Monsters::UpdateBrute(Monster& m, const TileMap& map, float px, float pz, f
 
 // Apply one hit: damage, white flash, wake up, knockback away from (fromX, fromZ).
 // Dead monsters stay in the list until RemoveDead, so callers can keep iterating.
-bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float knock)
+bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float knock, bool attack)
 {
     if (m.hp <= 0.0f)
         return false;
     const MonsterDef& def = kMonster[(int)m.type];
+    Player* player = Manager::GetGameObj<Player>();
 
-    m.hp -= (float)std::max(1, (int)roundf(damage));
+    float dealt = (float)std::max(1, (int)roundf(damage));
+    if (attack && player)
+    {
+        // Executioner: a hit that would leave it under 25% HP kills it instead
+        if (player->IsExecutioner() && m.hp - dealt > 0.0f && (m.hp - dealt) / m.maxHp < 0.25f)
+        {
+            dealt = m.hp;
+            DebugUI::Log("Executed!");
+        }
+        if (player->HasVenom())
+        {
+            m.poison = 3.0f;
+            m.poisonTick = 0.0f;
+        }
+    }
+    m.hp -= dealt;
     m.flash = 0.1f;
     m.awake = true;
 
@@ -540,6 +578,8 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
     if (m.hp > 0.0f)
         return false;
     DebugUI::Log("You defeated the %s.", def.name);
+    if (player)
+        player->OnKill();               // Leech
     if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)
         DropPotion(m.x, m.z);           // 12% potion drop
     return true;
@@ -564,7 +604,7 @@ int Monsters::HitInArc(float ox, float oz, float facing, float range, float arc,
     return kills;
 }
 
-int Monsters::HitInRadius(float x, float z, float radius, float damage, float knock, float freeze)
+int Monsters::HitInRadius(float x, float z, float radius, float damage, float knock, float freeze, bool attack)
 {
     int kills = 0;
     for (Monster& m : m_List)
@@ -575,7 +615,7 @@ int Monsters::HitInRadius(float x, float z, float radius, float damage, float kn
             continue;
         if (freeze > 0.0f)
             m.frozen = freeze;
-        if (Damage(m, damage, x, z, knock))
+        if (Damage(m, damage, x, z, knock, attack))
             kills++;
     }
     RemoveDead();
@@ -598,19 +638,19 @@ bool Monsters::HitAtPoint(float x, float z, float extra, float damage, float fro
     return false;
 }
 
-int Monsters::HitAlongDash(float x, float z, float damage, int dashId)
+int Monsters::HitOnce(float x, float z, float extra, float damage, int hitId, float knock)
 {
     int kills = 0;
     for (Monster& m : m_List)
     {
-        if (m.dashId == dashId)
-            continue;                   // each dash hits a monster only once
+        if (m.lastHitId == hitId)
+            continue;                   // already hit by this dash / wave
         const float dx = m.x - x, dz = m.z - z;
-        const float r = 0.8f + kMonster[(int)m.type].radius;
+        const float r = extra + kMonster[(int)m.type].radius;
         if (dx * dx + dz * dz < r * r)
         {
-            m.dashId = dashId;
-            if (Damage(m, damage, x, z, 4.0f))
+            m.lastHitId = hitId;
+            if (Damage(m, damage, x, z, knock))
                 kills++;
         }
     }
@@ -719,6 +759,8 @@ void Monsters::Draw()
         material.Diffuse = XMFLOAT4(bright, bright, bright, 1.0f);
         if (m.frozen > 0.0f && bright == 1.0f)
             material.Diffuse = XMFLOAT4(0.55f, 1.3f, 1.6f, 1.0f);              // frozen: icy tint
+        else if (m.poison > 0.0f && bright == 1.0f)
+            material.Diffuse = XMFLOAT4(0.7f, 1.4f, 0.6f, 1.0f);               // poisoned: green tint           // frozen: icy tint
         Renderer::SetMaterial(material);
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height * squash, 1.0f) *
             invView * XMMatrixTranslation(m.x + shakeX, y, m.z));

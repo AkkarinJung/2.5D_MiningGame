@@ -18,6 +18,7 @@
 #include "GameState.h"
 #include "Text.h"
 #include "Lighting.h"
+#include "ShadowMap.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -97,8 +98,8 @@ void Player::Update()
     {
         const Lighting::Settings& ls = Lighting::GetSettings();
         Lighting::SetFocus(m_Position.x, m_Position.z);
-        Lighting::AddLight(m_Position.x, 1.7f, m_Position.z, ls.lampRadius, 0xffb866,
-                           ls.lampIntensity * Lighting::Flicker(0.0f));
+        Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius, 0xffb866,
+                          ls.lampIntensity * Lighting::Flicker(0.0f));   // light 0, casts shadows
     }
 
     if (GamePaused())
@@ -358,6 +359,9 @@ void Player::Draw()
 // Shadow pass (M8): the character model, depth only. Uses last frame's animated pose.
 void Player::DrawShadow()
 {
+    if (ShadowMap::IsLampPass())
+        return;     // the lamp is inside the player: the player must not shadow its own lamp
+
     if (m_Invincible > 0.0f && m_DashTime <= 0.0f && !IsDead() && ((int)(m_Invincible * 14.0f) % 2) == 1)
         return;     // blinking: no shadow on the hidden frames either
 

@@ -369,6 +369,15 @@ void DebugUI::Draw()
                 ImGui::ColorEdit3("Moon colour", ss.moonColor);
                 ImGui::SliderFloat("Moon intensity", &ss.moonIntensity, 0.0f, 2.0f, "%.2f");
                 ImGui::SliderFloat("Ambient in shadow", &ss.shadowedAmbient, 0.0f, 1.0f, "%.2f");
+                ImGui::Separator();
+                ImGui::Checkbox("Lamp shadows (cube map, 6 extra passes)", &ss.lampShadows);
+                const int sizes[3] = { 256, 512, 1024 };
+                const char* sizeNames[3] = { "256", "512", "1024" };
+                int sizeIndex = ss.lampFaceSize == 256 ? 0 : (ss.lampFaceSize == 1024 ? 2 : 1);
+                if (ImGui::Combo("Lamp face size", &sizeIndex, sizeNames, 3))
+                    ss.lampFaceSize = sizes[sizeIndex];
+                ImGui::SliderFloat("Lamp bias", &ss.lampBias, 0.0f, 0.15f, "%.3f");
+                ImGui::Separator();
                 ImGui::TextDisabled("Shadow map (depth, red = far):");
                 ImGui::Image((ImTextureID)(intptr_t)ShadowMap::GetSRV(), ImVec2(192.0f, 192.0f));
             }

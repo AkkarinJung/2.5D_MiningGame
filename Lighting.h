@@ -29,6 +29,9 @@ namespace Lighting
     void SetFocus(float x, float z);// the player: nearest lights win when there are more than 16
     void AddLight(float x, float y, float z, float radius, float r, float g, float b, float intensity);
     void AddLight(float x, float y, float z, float radius, uint32_t rgb, float intensity);
+    // The player's lamp: always light 0 in the shader, and the one light that casts shadows.
+    void SetLamp(float x, float y, float z, float radius, uint32_t rgb, float intensity);
+    bool GetLamp(float& x, float& y, float& z, float& radius);  // false if no lamp this frame
     // A light that fades out on its own over about half a second.
     void Flash(float x, float y, float z, float radius, uint32_t rgb, float intensity);
 

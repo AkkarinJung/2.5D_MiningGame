@@ -49,6 +49,9 @@ namespace
     FlashLight g_Flashes[kMaxFlashes];
     int   g_FlashCount = 0;
 
+    Light g_Lamp{};
+    bool  g_HasLamp = false;
+
     float g_FocusX = 0.0f, g_FocusZ = 0.0f;
     float g_Time = 0.0f;
 
@@ -86,6 +89,25 @@ namespace Lighting
     {
         g_LightCount = 0;
         g_Requested = 0;
+        g_HasLamp = false;
+    }
+
+    void SetLamp(float x, float y, float z, float radius, uint32_t rgb, float intensity)
+    {
+        float r, g, b;
+        Rgb(rgb, r, g, b);
+        g_Lamp.x = x; g_Lamp.y = y; g_Lamp.z = z; g_Lamp.radius = radius;
+        g_Lamp.r = r * intensity; g_Lamp.g = g * intensity; g_Lamp.b = b * intensity;
+        g_HasLamp = radius > 0.0f;
+        g_Requested++;
+    }
+
+    bool GetLamp(float& x, float& y, float& z, float& radius)
+    {
+        if (!g_HasLamp)
+            return false;
+        x = g_Lamp.x; y = g_Lamp.y; z = g_Lamp.z; radius = g_Lamp.radius;
+        return true;
     }
 
     void SetFocus(float x, float z)
@@ -162,15 +184,18 @@ namespace Lighting
             const float dx = g_Lights[i].x - g_FocusX, dz = g_Lights[i].z - g_FocusZ;
             g_Lights[i].sortKey = sqrtf(dx * dx + dz * dz) - g_Lights[i].radius;
         }
-        g_Used = std::min(g_LightCount, kMaxShaderLights);
-        if (g_LightCount > kMaxShaderLights)
-            std::nth_element(g_Lights, g_Lights + kMaxShaderLights, g_Lights + g_LightCount,
+        // The lamp takes slot 0 (the shader knows light 0 is the shadow-casting lamp)
+        const int lampSlots = g_HasLamp ? 1 : 0;
+        const int others = std::min(g_LightCount, kMaxShaderLights - lampSlots);
+        g_Used = others + lampSlots;
+        if (g_LightCount > others)
+            std::nth_element(g_Lights, g_Lights + others, g_Lights + g_LightCount,
                 [](const Light& a, const Light& b) { return a.sortKey < b.sortKey; });
 
         PointLightBuffer cb{};
         for (int i = 0; i < g_Used; i++)
         {
-            const Light& l = g_Lights[i];
+            const Light& l = (g_HasLamp && i == 0) ? g_Lamp : g_Lights[i - lampSlots];
             cb.posRadius[i] = XMFLOAT4(l.x, l.y, l.z, l.radius);
             cb.color[i] = XMFLOAT4(l.r, l.g, l.b, 1.0f);
         }

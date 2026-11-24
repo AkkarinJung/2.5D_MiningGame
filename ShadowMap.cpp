@@ -6,6 +6,7 @@
 #include "main.h"
 #include "renderer.h"
 #include "ShadowMap.h"
+#include "Lighting.h"
 #include <cmath>
 
 namespace
@@ -19,7 +20,11 @@ namespace
         XMFLOAT4 moonDirIntensity;          // xyz = direction the light travels, w = intensity
         XMFLOAT4 moonColor;                 // rgb, w = ambient kept in shadow
         XMFLOAT4 params;                    // x = texel size, y = bias, z = PCF on, w = shadows on
+        XMFLOAT4 lampPosFar;                // xyz = lamp position, w = far plane (lamp radius)
+        XMFLOAT4 lampParams;                // x = lamp shadows on, y = bias, z = 2 / face size, w = near plane
     };
+
+    const float kLampNear = 0.05f;
 
     ShadowMap::Settings g_Settings;
 
@@ -36,6 +41,55 @@ namespace
     ID3D11DepthStencilView* g_SavedDSV = nullptr;
     ID3D11RasterizerState* g_SavedRaster = nullptr;
     D3D11_VIEWPORT g_SavedViewport{};
+
+    // Lamp cube map
+    ID3D11Texture2D*          g_LampTexture = nullptr;
+    ID3D11DepthStencilView*   g_LampDSV[6] = {};
+    ID3D11ShaderResourceView* g_LampSRV = nullptr;
+    int   g_LampSize = 0;                   // face size the cube was created with
+    bool  g_LampActive = false;             // lamp shadows are being rendered this frame
+    bool  g_InLampPass = false;
+    float g_Lamp[4] = {};                   // x, y, z, radius of this frame's lamp
+
+    void Release(IUnknown* p);
+
+    void CreateLampCube(int size)
+    {
+        for (ID3D11DepthStencilView*& dsv : g_LampDSV)
+            if (dsv) { dsv->Release(); dsv = nullptr; }
+        if (g_LampSRV)     { g_LampSRV->Release();     g_LampSRV = nullptr; }
+        if (g_LampTexture) { g_LampTexture->Release(); g_LampTexture = nullptr; }
+
+        ID3D11Device* device = Renderer::GetDevice();
+        D3D11_TEXTURE2D_DESC td{};
+        td.Width = td.Height = size;
+        td.MipLevels = 1;
+        td.ArraySize = 6;                               // one slice per cube face
+        td.Format = DXGI_FORMAT_R32_TYPELESS;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DEFAULT;
+        td.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+        td.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+        device->CreateTexture2D(&td, nullptr, &g_LampTexture);
+        assert(g_LampTexture);
+
+        for (int face = 0; face < 6; face++)
+        {
+            D3D11_DEPTH_STENCIL_VIEW_DESC dd{};
+            dd.Format = DXGI_FORMAT_D32_FLOAT;
+            dd.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+            dd.Texture2DArray.FirstArraySlice = face;
+            dd.Texture2DArray.ArraySize = 1;
+            device->CreateDepthStencilView(g_LampTexture, &dd, &g_LampDSV[face]);
+        }
+
+        D3D11_SHADER_RESOURCE_VIEW_DESC sd{};
+        sd.Format = DXGI_FORMAT_R32_FLOAT;
+        sd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+        sd.TextureCube.MipLevels = 1;
+        device->CreateShaderResourceView(g_LampTexture, &sd, &g_LampSRV);
+        g_LampSize = size;
+    }
 
     void CreateRasterizer()
     {
@@ -97,6 +151,7 @@ namespace ShadowMap
         device->CreateBuffer(&bd, nullptr, &g_Buffer);
 
         CreateRasterizer();
+        CreateLampCube(g_Settings.lampFaceSize);
 
         // Start with "shadows off" in the buffer so the first frame is valid
         ShadowBuffer cb{};
@@ -116,6 +171,13 @@ namespace ShadowMap
         Release(g_Sampler); g_Sampler = nullptr;
         Release(g_Raster);  g_Raster = nullptr;
         Release(g_Buffer);  g_Buffer = nullptr;
+        for (ID3D11DepthStencilView*& dsv : g_LampDSV)
+        {
+            Release(dsv);
+            dsv = nullptr;
+        }
+        Release(g_LampSRV);     g_LampSRV = nullptr;
+        Release(g_LampTexture); g_LampTexture = nullptr;
     }
 
     void BeginPass(float focusX, float focusZ)
@@ -124,9 +186,17 @@ namespace ShadowMap
         if (g_Settings.slopeBias != g_RasterSlope)
             CreateRasterizer();                         // slider changed in the debug panel
 
-        // The map cannot be read and written at once: unbind it from the pixel shader first
-        ID3D11ShaderResourceView* none = nullptr;
-        ctx->PSSetShaderResources(1, 1, &none);
+        if (g_Settings.lampFaceSize != g_LampSize)
+            CreateLampCube(g_Settings.lampFaceSize);    // size changed in the debug panel
+
+        // The maps cannot be read and written at once: unbind them from the pixel shader first
+        ID3D11ShaderResourceView* none[2] = { nullptr, nullptr };
+        ctx->PSSetShaderResources(1, 2, none);          // t1 (moon) and t2 (lamp)
+
+        // This frame's lamp (set by the player during Update)
+        g_InLampPass = false;
+        g_LampActive = g_Settings.lampShadows &&
+                       Lighting::GetLamp(g_Lamp[0], g_Lamp[1], g_Lamp[2], g_Lamp[3]);
 
         // Remember the screen's targets, viewport and rasterizer
         ctx->OMGetRenderTargets(1, &g_SavedRTV, &g_SavedDSV);
@@ -168,7 +238,43 @@ namespace ShadowMap
         cb.moonDirIntensity = XMFLOAT4(d.x, d.y, d.z, g_Settings.moonIntensity);
         cb.moonColor = XMFLOAT4(g_Settings.moonColor[0], g_Settings.moonColor[1], g_Settings.moonColor[2], g_Settings.shadowedAmbient);
         cb.params = XMFLOAT4(1.0f / kSize, g_Settings.bias, g_Settings.pcf ? 1.0f : 0.0f, g_Settings.enabled ? 1.0f : 0.0f);
+        cb.lampPosFar = XMFLOAT4(g_Lamp[0], g_Lamp[1], g_Lamp[2], g_Lamp[3]);
+        cb.lampParams = XMFLOAT4(g_LampActive ? 1.0f : 0.0f, g_Settings.lampBias, 2.0f / g_LampSize, kLampNear);
         ctx->UpdateSubresource(g_Buffer, 0, nullptr, &cb, 0, 0);
+    }
+
+    bool LampShadowsActive()
+    {
+        return g_LampActive;
+    }
+
+    // Cube face cameras, in Direct3D's face order (+X, -X, +Y, -Y, +Z, -Z):
+    // each looks along one axis with a 90-degree field of view, so together they see everything.
+    void BeginLampFace(int face)
+    {
+        static const float kLook[6][3] = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } };
+        static const float kUp[6][3]   = { { 0, 1, 0 }, {  0, 1, 0 }, { 0, 0, -1 }, { 0, 0, 1 }, { 0, 1, 0 }, { 0, 1,  0 } };
+
+        ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+        g_InLampPass = true;
+
+        ctx->OMSetRenderTargets(0, nullptr, g_LampDSV[face]);
+        ctx->ClearDepthStencilView(g_LampDSV[face], D3D11_CLEAR_DEPTH, 1.0f, 0);
+        D3D11_VIEWPORT vp{};
+        vp.Width = vp.Height = (float)g_LampSize;
+        vp.MaxDepth = 1.0f;
+        ctx->RSSetViewports(1, &vp);
+
+        const XMVECTOR eye = XMVectorSet(g_Lamp[0], g_Lamp[1], g_Lamp[2], 1.0f);
+        const XMVECTOR look = XMVectorSet(kLook[face][0], kLook[face][1], kLook[face][2], 0.0f);
+        const XMVECTOR up = XMVectorSet(kUp[face][0], kUp[face][1], kUp[face][2], 0.0f);
+        Renderer::SetViewMatrix(XMMatrixLookAtLH(eye, XMVectorAdd(eye, look), up));
+        Renderer::SetProjectionMatrix(XMMatrixPerspectiveFovLH(XM_PIDIV2, 1.0f, kLampNear, g_Lamp[3]));
+    }
+
+    bool IsLampPass()
+    {
+        return g_InLampPass;
     }
 
     void EndPass()
@@ -182,8 +288,10 @@ namespace ShadowMap
         Release(g_SavedDSV);    g_SavedDSV = nullptr;
         Release(g_SavedRaster); g_SavedRaster = nullptr;
 
-        ctx->PSSetShaderResources(1, 1, &g_SRV);    // t1 for pointLitPS
-        ctx->PSSetSamplers(1, 1, &g_Sampler);       // s1
+        ctx->PSSetShaderResources(1, 1, &g_SRV);        // t1: moon map for pointLitPS
+        ctx->PSSetShaderResources(2, 1, &g_LampSRV);    // t2: lamp cube map
+        ctx->PSSetSamplers(1, 1, &g_Sampler);           // s1
+        g_InLampPass = false;
     }
 
     Settings& GetSettings() { return g_Settings; }

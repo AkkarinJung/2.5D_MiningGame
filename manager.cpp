@@ -121,6 +121,14 @@ void Manager::Draw()
 	ShadowMap::BeginPass(Lighting::FocusX(), Lighting::FocusZ());
 	for (GameObject* obj : m_GameObjects)
 		obj->DrawShadow();
+	// Lamp shadows: the same casters again, once for each of the 6 cube faces around the lamp
+	if (ShadowMap::LampShadowsActive())
+		for (int face = 0; face < 6; face++)
+		{
+			ShadowMap::BeginLampFace(face);
+			for (GameObject* obj : m_GameObjects)
+				obj->DrawShadow();
+		}
 	ShadowMap::EndPass();
 
 	Camera* camera = GetGameObj<Camera>();

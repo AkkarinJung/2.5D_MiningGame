@@ -35,6 +35,18 @@ private:
     int m_BlocksLeft = 0;
     bool m_Motherlode = false;          // card: more gold and crystal on later floors
 
+    // Fog of war
+    std::vector<uint8_t> m_Visible;     // 1 = in sight right now
+    std::vector<uint8_t> m_Seen;        // 1 = seen at some point on this floor
+    int   m_ViewTile = -1;              // tile and radius the visibility was last worked out for
+    float m_ViewRadius = -1.0f;
+    int   m_ViewBlocks = -1;            // blocks left at that time (a broken block opens the view)
+    bool  m_FogDirty = true;            // the texture needs uploading
+    float m_FogSeenLevel = -1.0f;       // seen brightness the texture was built with
+    ID3D11Texture2D*          m_FogTexture = nullptr;   // one texel per tile, R8
+    ID3D11ShaderResourceView* m_FogSRV = nullptr;
+    ID3D11SamplerState*       m_FogSampler = nullptr;
+
     uint32_t m_Seed = 0;
     int m_FloorNo = 1;
     int m_StartX = 0, m_StartZ = 0;
@@ -59,6 +71,8 @@ private:
     bool BoxHits(float x, float z, float half) const;
     void PlaceOre(uint32_t seed, int floorNo);
     void BuildWallMesh();
+    bool CanSee(float ax, float az, int tx, int tz) const;
+    void UploadFog();
 
 public:
     void Init() override;
@@ -90,6 +104,11 @@ public:
     int GetBlocksLeft() const { return m_BlocksLeft; }
     void SetMotherlode(bool on) { m_Motherlode = on; }
     bool HasMotherlode() const { return m_Motherlode; }
+
+    // Fog of war: the player calls this every frame; work is only redone when needed.
+    void UpdateVisibility(float x, float z, float radius);
+    bool IsVisible(int x, int z) const;
+    void RevealAll();                   // debug panel
     int GetStartDistance(int x, int z) const     // steps from the start tile, -1 = unreachable
     {
         return (x < 0 || z < 0 || x >= W || z >= H) ? -1 : m_Dist[z * W + x];

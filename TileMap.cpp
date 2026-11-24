@@ -147,12 +147,25 @@ void TileMap::Uninit()
     SafeRelease(m_PixelShader);
     SafeRelease(m_WallTexture);
     SafeRelease(m_FloorTexture);
+    SafeRelease(m_FogTexture);
+    SafeRelease(m_FogSRV);
+    SafeRelease(m_FogSampler);
 
     GameObject::Uninit();
 }
 
 void TileMap::Update()
 {
+    // Fog of war: upload the visibility worked out last frame and bind it (t3, s2) for pointLitPS
+    UploadFog();
+    if (m_FogSRV)
+    {
+        ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+        ctx->PSSetShaderResources(3, 1, &m_FogSRV);
+        ctx->PSSetSamplers(2, 1, &m_FogSampler);
+        Lighting::SetFogMap(W, H);
+    }
+
     // M7: every crystal glows and lights the floor around it; the stairs give a gold glow
     for (int i = 0; i < W * H; i++)
         if (m_Tiles[i] == Tile::Block && m_OreGrade[i] == 3)
@@ -295,6 +308,12 @@ void TileMap::Generate(uint32_t seed, int floorNo)
 
     BuildWallMesh();
     PlaceOre(seed, floorNo);
+
+    // New floor: nothing seen yet
+    m_Visible.assign(W * H, 0);
+    m_Seen.assign(W * H, 0);
+    m_ViewTile = -1;
+    m_FogDirty = true;
 }
 
 // Bake every visible wall into one vertex buffer. Walls never change during a floor,
@@ -585,5 +604,126 @@ void TileMap::DrawShadow()
         Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
             XMMatrixTranslation(i % W + 0.5f, size * 0.5f, i / W + 0.5f));
         ctx->Draw(m_CubeVertexCount, 0);
+    }
+}
+
+// ---------------------------------------------------------------- fog of war
+
+// Line of sight from a point to the centre of tile (tx, tz), sampled every half tile.
+// Walls block it (ore blocks do not); the target tile itself never blocks, so walls are seen.
+bool TileMap::CanSee(float ax, float az, int tx, int tz) const
+{
+    const float bx = tx + 0.5f, bz = tz + 0.5f;
+    const float dx = bx - ax, dz = bz - az;
+    const int n = (int)ceilf(std::max(fabsf(dx), fabsf(dz)) * 2.0f);
+    for (int s = 1; s < n; s++)
+    {
+        const float t = (float)s / n;
+        const int sx = (int)floorf(ax + dx * t), sz = (int)floorf(az + dz * t);
+        if (sx == tx && sz == tz)
+            break;                          // reached the target tile
+        if (Get(sx, sz) == Tile::Wall)
+            return false;
+    }
+    return true;
+}
+
+void TileMap::UpdateVisibility(float x, float z, float radius)
+{
+    const int px = std::min(std::max((int)floorf(x), 0), W - 1);
+    const int pz = std::min(std::max((int)floorf(z), 0), H - 1);
+    const int tile = pz * W + px;
+    if (tile == m_ViewTile && radius == m_ViewRadius && m_BlocksLeft == m_ViewBlocks)
+        return;                             // nothing changed since last time
+    m_ViewTile = tile;
+    m_ViewRadius = radius;
+    m_ViewBlocks = m_BlocksLeft;
+
+    std::fill(m_Visible.begin(), m_Visible.end(), (uint8_t)0);
+    const int r = (int)ceilf(radius);
+    const float cx = px + 0.5f, cz = pz + 0.5f;
+    for (int tz = pz - r; tz <= pz + r; tz++)
+        for (int tx = px - r; tx <= px + r; tx++)
+        {
+            if (tx < 0 || tz < 0 || tx >= W || tz >= H)
+                continue;
+            const float dx = tx + 0.5f - cx, dz = tz + 0.5f - cz;
+            if (dx * dx + dz * dz > radius * radius)
+                continue;
+            if (!CanSee(cx, cz, tx, tz))
+                continue;
+            m_Visible[tz * W + tx] = 1;
+            m_Seen[tz * W + tx] = 1;
+        }
+    m_FogDirty = true;
+}
+
+bool TileMap::IsVisible(int x, int z) const
+{
+    if (!Lighting::GetSettings().fogOfWar)
+        return true;
+    if (x < 0 || z < 0 || x >= W || z >= H || m_Visible.empty())
+        return false;
+    return m_Visible[z * W + x] != 0;
+}
+
+void TileMap::RevealAll()
+{
+    std::fill(m_Seen.begin(), m_Seen.end(), (uint8_t)1);
+    m_FogDirty = true;
+}
+
+// Build the 48x34 brightness texture (created on first use) and upload it when it changed.
+void TileMap::UploadFog()
+{
+    if (m_Visible.empty())
+        return;
+    ID3D11Device* device = Renderer::GetDevice();
+    ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+
+    if (!m_FogTexture)
+    {
+        D3D11_TEXTURE2D_DESC td{};
+        td.Width = W;
+        td.Height = H;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_R8_UNORM;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_DYNAMIC;
+        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        device->CreateTexture2D(&td, nullptr, &m_FogTexture);
+        assert(m_FogTexture);
+        device->CreateShaderResourceView(m_FogTexture, nullptr, &m_FogSRV);
+
+        D3D11_SAMPLER_DESC sd{};
+        sd.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;   // soft edges between visible / seen / unseen
+        sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+        sd.MaxLOD = D3D11_FLOAT32_MAX;
+        device->CreateSamplerState(&sd, &m_FogSampler);
+        m_FogDirty = true;
+    }
+
+    const float seenLevel = Lighting::GetSettings().seenBrightness;
+    if (!m_FogDirty && seenLevel == m_FogSeenLevel)
+        return;
+    m_FogDirty = false;
+    m_FogSeenLevel = seenLevel;
+
+    const uint8_t seen = (uint8_t)(std::min(std::max(seenLevel, 0.0f), 1.0f) * 255.0f);
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    if (SUCCEEDED(ctx->Map(m_FogTexture, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+    {
+        for (int z = 0; z < H; z++)
+        {
+            uint8_t* row = (uint8_t*)mapped.pData + z * mapped.RowPitch;     // rows may be padded
+            for (int x = 0; x < W; x++)
+            {
+                const int i = z * W + x;
+                row[x] = m_Visible[i] ? 255 : (m_Seen[i] ? seen : 0);
+            }
+        }
+        ctx->Unmap(m_FogTexture, 0);
     }
 }

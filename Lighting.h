@@ -20,6 +20,11 @@ namespace Lighting
         bool  fog = true;
         float fogStart = 11.0f;                        // distance from the camera
         float fogEnd = 21.0f;
+
+        // Fog of war: unseen tiles are black, seen tiles stay dim, visible tiles are lit
+        bool  fogOfWar = true;
+        float viewExtra = 2.0f;                        // view radius = lamp radius + this
+        float seenBrightness = 0.2f;                   // remembered but out of sight
     };
 
     void Init();                    // after Renderer::Init
@@ -36,6 +41,7 @@ namespace Lighting
     void Flash(float x, float y, float z, float radius, uint32_t rgb, float intensity);
 
     void Upload();                  // start of Manager::Draw: pick the 16 nearest, fill the buffer
+    void SetFogMap(int width, int height);  // the tile map has a fog texture bound this frame (t3, s2)
     float FocusX();                 // where SetFocus put the player (the shadow box follows it)
     float FocusZ();
 

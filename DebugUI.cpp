@@ -348,6 +348,16 @@ void DebugUI::Draw()
                 ImGui::Checkbox("Fog", &ls.fog);
                 ImGui::SliderFloat("Fog start", &ls.fogStart, 0.0f, 30.0f, "%.1f");
                 ImGui::SliderFloat("Fog end", &ls.fogEnd, 1.0f, 40.0f, "%.1f");
+                ImGui::Separator();
+                ImGui::Checkbox("Fog of war", &ls.fogOfWar);
+                ImGui::SliderFloat("View = lamp +", &ls.viewExtra, 0.0f, 6.0f, "%.1f tiles");
+                ImGui::SliderFloat("Seen brightness", &ls.seenBrightness, 0.0f, 1.0f, "%.2f");
+                if (ImGui::Button("Reveal map") && map)
+                {
+                    map->RevealAll();
+                    Log("[debug] map revealed");
+                }
+                ImGui::SameLine();
                 if (ImGui::Button("Test flash at player") && player)
                 {
                     const Vector3 p = player->GetPosition();

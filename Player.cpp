@@ -100,6 +100,11 @@ void Player::Update()
         Lighting::SetFocus(m_Position.x, m_Position.z);
         Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius + m_LampBonus, 0xffb866,
                           ls.lampIntensity * Lighting::Flicker(0.0f));   // light 0, casts shadows
+
+        // Fog of war: you see a little further than your lamp reaches (lamp radius + 2)
+        TileMap* map = Manager::GetGameObj<TileMap>();
+        if (map)
+            map->UpdateVisibility(m_Position.x, m_Position.z, ls.lampRadius + m_LampBonus + ls.viewExtra);
     }
 
     if (GamePaused())

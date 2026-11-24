@@ -15,6 +15,19 @@ cbuffer PointLightBuffer : register(b6)
     float4 AmbientCount; // rgb = ambient, w = number of lights
     float4 FogColorStart; // rgb = fog colour, w = fog start distance
     float4 FogEndEnabled; // x = fog end distance, y = lighting on (1) / off (0)
+    float4 FogOfWar; // x = on, y = 1 / map width, z = 1 / map height
+}
+
+// Fog of war: one texel per tile (1 = visible now, ~0.2 = seen before, 0 = never seen),
+// filtered so the edges between the zones are soft.
+Texture2D<float> g_FogOfWar : register(t3);
+SamplerState g_FogOfWarSampler : register(s2);
+
+float FogOfWarFactor(float3 P)
+{
+    if (FogOfWar.x < 0.5f)
+        return 1.0f;
+    return g_FogOfWar.SampleLevel(g_FogOfWarSampler, float2(P.x * FogOfWar.y, P.z * FogOfWar.z), 0.0f);
 }
 
 cbuffer ShadowBuffer : register(b7)
@@ -125,7 +138,7 @@ void main(in PS_IN In, out float4 outDiffuse : SV_Target)
         light += LightColor[i].rgb * falloff * ndl * blocked;
     }
 
-    float3 color = base.rgb * light + Material.Emission.rgb;
+    float3 color = (base.rgb * light + Material.Emission.rgb) * FogOfWarFactor(P); // unseen: black, glow too
 
     const float d = length(P - CameraPosition.xyz);
     const float fog = saturate((d - FogColorStart.w) / max(FogEndEnabled.x - FogColorStart.w, 0.001f));

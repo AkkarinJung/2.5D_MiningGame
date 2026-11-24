@@ -745,9 +745,12 @@ void Monsters::Draw()
     material.Ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     material.TextureEnable = TRUE;
     material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);      // w = 1: camera-facing sprite (upward normal)
+    const TileMap* map = Manager::GetGameObj<TileMap>();
 
     for (const Monster& m : m_List)
     {
+        if (map && !map->IsVisible((int)floorf(m.x), (int)floorf(m.z)))
+            continue;                   // fog of war: monsters out of sight are not drawn
         const MonsterDef& def = kMonster[(int)m.type];
         float y = 0.0f, squash = 1.0f;
         if (m.type == MonsterType::Bat)
@@ -802,6 +805,8 @@ void Monsters::Draw()
     {
         if (m.hp >= m.maxHp)
             continue;
+        if (map && !map->IsVisible((int)floorf(m.x), (int)floorf(m.z)))
+            continue;                   // no HP bars for monsters out of sight
         const MonsterDef& def = kMonster[(int)m.type];
         const float barY = def.height + 0.15f + (m.type == MonsterType::Bat ? 0.45f : 0.0f);
         const float w = 0.6f, h = 0.07f;
@@ -851,9 +856,12 @@ void Monsters::DrawShadow()
     invView.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
     UINT stride = sizeof(VERTEX_3D);
     UINT offset = 0;
+    const TileMap* map = Manager::GetGameObj<TileMap>();
 
     for (const Monster& m : m_List)
     {
+        if (map && !map->IsVisible((int)floorf(m.x), (int)floorf(m.z)))
+            continue;                   // hidden monsters must not give themselves away by their shadow
         const MonsterDef& def = kMonster[(int)m.type];
         const float y = m.type == MonsterType::Bat ? 0.45f + sinf(m_Time * 11.0f + m.phase) * 0.08f : 0.0f;
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height, 1.0f) *

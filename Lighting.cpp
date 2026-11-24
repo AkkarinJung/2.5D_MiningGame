@@ -36,6 +36,7 @@ namespace
         XMFLOAT4 ambientCount;
         XMFLOAT4 fogColorStart;
         XMFLOAT4 fogEndEnabled;
+        XMFLOAT4 fogOfWar;                  // x = on, y = 1 / map width, z = 1 / map height
     };
 
     Lighting::Settings g_Settings;
@@ -48,6 +49,8 @@ namespace
 
     FlashLight g_Flashes[kMaxFlashes];
     int   g_FlashCount = 0;
+
+    int   g_FogMapW = 0, g_FogMapH = 0;     // 0 = no fog-of-war texture this frame
 
     Light g_Lamp{};
     bool  g_HasLamp = false;
@@ -90,6 +93,13 @@ namespace Lighting
         g_LightCount = 0;
         g_Requested = 0;
         g_HasLamp = false;
+        g_FogMapW = g_FogMapH = 0;
+    }
+
+    void SetFogMap(int width, int height)
+    {
+        g_FogMapW = width;
+        g_FogMapH = height;
     }
 
     void SetLamp(float x, float y, float z, float radius, uint32_t rgb, float intensity)
@@ -203,6 +213,9 @@ namespace Lighting
         cb.ambientCount = XMFLOAT4(g_Settings.ambient[0], g_Settings.ambient[1], g_Settings.ambient[2], (float)g_Used);
         cb.fogColorStart = XMFLOAT4(clear[0], clear[1], clear[2], g_Settings.fog ? g_Settings.fogStart : 1000.0f);
         cb.fogEndEnabled = XMFLOAT4(g_Settings.fog ? g_Settings.fogEnd : 2000.0f, g_Settings.enabled ? 1.0f : 0.0f, 0.0f, 0.0f);
+        const bool fogOfWar = g_Settings.fogOfWar && g_FogMapW > 0 && g_FogMapH > 0;
+        cb.fogOfWar = XMFLOAT4(fogOfWar ? 1.0f : 0.0f, fogOfWar ? 1.0f / g_FogMapW : 0.0f,
+                               fogOfWar ? 1.0f / g_FogMapH : 0.0f, 0.0f);
 
         if (g_Buffer)
             Renderer::GetDeviceContext()->UpdateSubresource(g_Buffer, 0, nullptr, &cb, 0, 0);

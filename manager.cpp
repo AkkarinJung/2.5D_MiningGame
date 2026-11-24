@@ -8,6 +8,8 @@
 #include "Result.h"
 #include "audio.h"
 #include "DebugUI.h"
+#include "SaveData.h"
+#include "Text.h"
 
 #include "GameObject.h"
 
@@ -21,6 +23,8 @@ void Manager::Init()
 {
 	Renderer::Init();
 	DebugUI::Init();
+	SaveData::Load();          // settings + records from %LOCALAPPDATA%\Deepvein
+	LoadTranslations();        // asset\text\ja.txt
 	Input::Init();
 	Audio::InitMaster();
 

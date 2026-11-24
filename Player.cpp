@@ -17,6 +17,7 @@
 #include "Cards.h"
 #include "GameState.h"
 #include "Text.h"
+#include "Lighting.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -61,10 +62,10 @@ void Player::Init()
 
     // シェーダー読込
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout,
-        "shader\\litTextureVS.cso");
+        "shader\\pointLitVS.cso");
 
     Renderer::CreatePixelShader(&m_PixelShader,
-        "shader\\litTexturePS.cso");
+        "shader\\pointLitPS.cso");
 
     //BGM
     m_JumpSE = AddGameComponent<Audio>(this);
@@ -91,6 +92,15 @@ void Player::Uninit()
 
 void Player::Update()
 {
+    // Lamp (M7): the light the player carries, with a slight flicker. Added before the
+    // pause check so the dungeon stays lit while a card pick or prompt is open.
+    {
+        const Lighting::Settings& ls = Lighting::GetSettings();
+        Lighting::SetFocus(m_Position.x, m_Position.z);
+        Lighting::AddLight(m_Position.x, 1.7f, m_Position.z, ls.lampRadius, 0xffb866,
+                           ls.lampIntensity * Lighting::Flicker(0.0f));
+    }
+
     if (GamePaused())
         return;     // card pick open: freeze in place
 
@@ -492,6 +502,7 @@ void Player::UseSkill()
             }
         if (projectiles)
             projectiles->AddRing(x, z, 3.5f, 0x6fdcea, 0.45f);
+        Lighting::Flash(x, 1.2f, z, 6.0f, 0x6fdcea, 4.0f);
         DebugUI::Log("Frost Nova!");
         break;
     }

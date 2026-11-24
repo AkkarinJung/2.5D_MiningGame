@@ -69,7 +69,9 @@ void Monsters::Init()
     m_Flow.reserve(TileMap::W * TileMap::H);
 
     Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\unlitTextureVS.cso");
-    Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");
+    Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");     // HP bars
+    Renderer::CreateVertexShader(&m_LitVS, &m_LitLayout, "shader\\pointLitVS.cso");  // sprites (M7)
+    Renderer::CreatePixelShader(&m_LitPS, "shader\\pointLitPS.cso");
 
     // Sprite atlas: every 8x8 sprite (monsters, then the potion) side by side in one texture.
     const int atlasW = 8 * kSpriteCount, atlasH = 8;
@@ -144,6 +146,9 @@ void Monsters::Uninit()
     SafeRelease(m_VertexLayout);
     SafeRelease(m_VertexShader);
     SafeRelease(m_PixelShader);
+    SafeRelease(m_LitLayout);
+    SafeRelease(m_LitVS);
+    SafeRelease(m_LitPS);
     SafeRelease(m_Atlas);
     SafeRelease(m_PointSampler);
 
@@ -716,9 +721,9 @@ void Monsters::Draw()
         return;
 
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
-    ctx->IASetInputLayout(m_VertexLayout);
-    ctx->VSSetShader(m_VertexShader, NULL, 0);
-    ctx->PSSetShader(m_PixelShader, NULL, 0);
+    ctx->IASetInputLayout(m_LitLayout);         // sprites and potions are lit (M7)
+    ctx->VSSetShader(m_LitVS, NULL, 0);
+    ctx->PSSetShader(m_LitPS, NULL, 0);
     ctx->PSSetShaderResources(0, 1, &m_Atlas);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
@@ -737,6 +742,7 @@ void Monsters::Draw()
     MATERIAL material{};
     material.Ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
     material.TextureEnable = TRUE;
+    material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);      // w = 1: camera-facing sprite (upward normal)
 
     for (const Monster& m : m_List)
     {
@@ -757,7 +763,10 @@ void Monsters::Draw()
         const bool flicker = windUp && ((int)(m_Time / 0.07f) % 2) == 0;
 
         const float bright = (m.flash > 0.0f || flicker) ? 4.0f : 1.0f;     // hit flash
-        material.Diffuse = XMFLOAT4(bright, bright, bright, 1.0f);
+        material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+        // Hit flash / brute warning: glow white whatever the lighting (M7: emission, not brightness)
+        const float glow = bright > 1.0f ? 1.0f : 0.0f;
+        material.Emission = XMFLOAT4(glow, glow, glow, 1.0f);
         if (m.frozen > 0.0f && bright == 1.0f)
             material.Diffuse = XMFLOAT4(0.55f, 1.3f, 1.6f, 1.0f);              // frozen: icy tint
         else if (m.poison > 0.0f && bright == 1.0f)
@@ -770,6 +779,7 @@ void Monsters::Draw()
     }
     // Potions bob gently on the floor
     material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    material.Emission = XMFLOAT4(0.15f, 0.04f, 0.04f, 1.0f);   // potions glow faintly so they can be found
     Renderer::SetMaterial(material);
     ctx->IASetVertexBuffers(0, 1, &m_QuadVB[kMonsterTypeCount], &stride, &offset);
     for (const Potion& potion : m_Potions)
@@ -779,8 +789,13 @@ void Monsters::Draw()
             invView * XMMatrixTranslation(potion.x, y, potion.z));
         ctx->Draw(4, 0);
     }
-    // HP bars over hurt monsters: dark background, red fill nudged toward the camera
+    // HP bars over hurt monsters: dark background, red fill nudged toward the camera.
+    // Unlit, so they stay readable in the dark.
+    ctx->IASetInputLayout(m_VertexLayout);
+    ctx->VSSetShader(m_VertexShader, NULL, 0);
+    ctx->PSSetShader(m_PixelShader, NULL, 0);
     material.TextureEnable = FALSE;
+    material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
     for (const Monster& m : m_List)
     {
         if (m.hp >= m.maxHp)

@@ -10,6 +10,7 @@
 #include "DebugUI.h"
 #include "SaveData.h"
 #include "Text.h"
+#include "Lighting.h"
 
 #include "GameObject.h"
 
@@ -22,6 +23,7 @@ float Manager::m_ChangeTime = 0.0f;
 void Manager::Init()
 {
 	Renderer::Init();
+	Lighting::Init();           // point-light constant buffer (b6)
 	DebugUI::Init();
 	SaveData::Load();          // settings + records from %LOCALAPPDATA%\Deepvein
 	LoadTranslations();        // asset\text\ja.txt
@@ -48,6 +50,7 @@ void Manager::Uninit()
 
 	DebugUI::Uninit();
 	Audio::UninitMaster();
+	Lighting::Uninit();
 	Renderer::Uninit();
 	Input::Uninit();
 }
@@ -57,6 +60,7 @@ void Manager::Update()
 	float dt = 1.0f / 60.0f;
 	Input::Update();
 	DebugUI::BeginFrame();
+	Lighting::BeginFrame();     // game objects add this frame's lights in Update
 
 	if (m_Scene != nullptr)
 		m_Scene->Update();
@@ -108,6 +112,7 @@ void Manager::Update()
 void Manager::Draw()
 {
 	Renderer::Begin();
+	Lighting::Upload();         // nearest 16 lights -> shader
 	Camera* camera = GetGameObj<Camera>();
 	if (camera)
 	{

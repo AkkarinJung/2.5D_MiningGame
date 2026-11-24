@@ -13,6 +13,7 @@
 #include "Projectiles.h"
 #include "SpriteAtlas.h"
 #include "GameState.h"
+#include "Lighting.h"
 #include <cmath>
 #include <algorithm>
 
@@ -189,6 +190,7 @@ void Projectiles::AddRing(float x, float z, float radius, uint32_t rgb, float li
 void Projectiles::Explode(float x, float z, float radius, float damage, float mine)
 {
     AddRing(x, z, radius, 0xffb35a);
+    Lighting::Flash(x, 1.2f, z, radius * 4.0f, 0xffa050, 5.0f);     // M7: explosion flash
 
     Camera* camera = Manager::GetGameObj<Camera>();
     if (camera)

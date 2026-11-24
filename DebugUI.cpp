@@ -14,6 +14,7 @@
 #include "Cards.h"
 #include "Text.h"
 #include "SaveData.h"
+#include "Lighting.h"
 #include <shellapi.h>
 
 #include "imgui/imgui.h"
@@ -327,6 +328,29 @@ void DebugUI::Draw()
                 {
                     player->GainMiningXp((float)MiningXpToNext(player->GetMineLevel()) - player->GetMineXp(), 3);
                     Log("[debug] forced a level-up (crystal odds)");
+                }
+            }
+
+            // ---- Lighting (M7)
+            if (ImGui::CollapsingHeader("Lighting"))
+            {
+                Lighting::Settings& ls = Lighting::GetSettings();
+                ImGui::Text("Lights: %d requested, %d used (max 16)", Lighting::LightsRequested(), Lighting::LightsUsed());
+                ImGui::Checkbox("Lighting on", &ls.enabled);
+                ImGui::ColorEdit3("Ambient", ls.ambient);
+                ImGui::SliderFloat("Lamp radius", &ls.lampRadius, 2.0f, 14.0f, "%.1f");
+                ImGui::SliderFloat("Lamp intensity", &ls.lampIntensity, 0.0f, 5.0f, "%.2f");
+                ImGui::Checkbox("Flicker", &ls.flicker);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::SliderFloat("Strength##flicker", &ls.flickerStrength, 0.0f, 4.0f, "%.1f");
+                ImGui::Checkbox("Fog", &ls.fog);
+                ImGui::SliderFloat("Fog start", &ls.fogStart, 0.0f, 30.0f, "%.1f");
+                ImGui::SliderFloat("Fog end", &ls.fogEnd, 1.0f, 40.0f, "%.1f");
+                if (ImGui::Button("Test flash at player") && player)
+                {
+                    const Vector3 p = player->GetPosition();
+                    Lighting::Flash(p.x, 1.2f, p.z, 6.0f, 0xffa050, 5.0f);
                 }
             }
 

@@ -9,7 +9,7 @@
 			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		// É}ÉeÉäÉAÉãê›íË
-		MATERIAL material;
+		MATERIAL material{};     // zeroed: the lit shader reads Emission (M7);
 		ZeroMemory(&material, sizeof(material));
 		material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 		material.Ambient = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);

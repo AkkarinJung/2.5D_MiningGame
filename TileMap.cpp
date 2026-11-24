@@ -8,6 +8,7 @@
 #include "manager.h"
 #include "TileMap.h"
 #include "OreData.h"
+#include "Lighting.h"
 #include <random>
 #include <cmath>
 #include <algorithm>
@@ -85,8 +86,8 @@ void TileMap::Init()
 {
     m_Layer = 1;
 
-    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\unlitTextureVS.cso");
-    Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");
+    Renderer::CreateVertexShader(&m_VertexShader, &m_VertexLayout, "shader\\pointLitVS.cso");   // M7: lit by point lights
+    Renderer::CreatePixelShader(&m_PixelShader, "shader\\pointLitPS.cso");
 
     m_WallTexture = LoadTexture(L"asset\\texture\\Brick.jpg");
     m_FloorTexture = LoadTexture(L"asset\\texture\\block_field.png");
@@ -152,6 +153,13 @@ void TileMap::Uninit()
 
 void TileMap::Update()
 {
+    // M7: every crystal glows and lights the floor around it; the stairs give a gold glow
+    for (int i = 0; i < W * H; i++)
+        if (m_Tiles[i] == Tile::Block && m_OreGrade[i] == 3)
+            Lighting::AddLight(i % W + 0.5f, 0.8f, i / W + 0.5f, 4.5f, 0x6fdcea,
+                               1.1f * Lighting::Flicker((float)i));
+    Lighting::AddLight(m_StairsX + 0.5f, 0.6f, m_StairsZ + 0.5f, 3.0f, 0xe0a83a, 0.8f);
+
     GameObject::Update();
 }
 
@@ -442,6 +450,11 @@ MineResult TileMap::MineBlock(int x, int z, float power, int mineLevel)
         m_BlockDamage[i] = 0.0f;
         m_BlocksLeft--;
         result.broken = true;
+
+        // M7: a short flash in the ore's colour, stronger for gold and crystal
+        const OreDef& ore = kOre[result.grade];
+        const uint32_t rgb = ((uint32_t)(ore.r * 255.0f) << 16) | ((uint32_t)(ore.g * 255.0f) << 8) | (uint32_t)(ore.b * 255.0f);
+        Lighting::Flash(x + 0.5f, 1.0f, z + 0.5f, 5.0f, rgb, 1.0f + result.grade * 0.6f);
     }
     return result;
 }
@@ -519,6 +532,13 @@ void TileMap::Draw()
 
         const OreDef& ore = kOre[m_OreGrade[i]];
         material.Diffuse = XMFLOAT4(ore.r, ore.g, ore.b, 1.0f);
+        // Glow (M7): crystal shines on its own, gold a little
+        if (m_OreGrade[i] == 3)
+            material.Emission = XMFLOAT4(0.12f, 0.35f, 0.40f, 0.0f);
+        else if (m_OreGrade[i] == 2)
+            material.Emission = XMFLOAT4(0.12f, 0.08f, 0.0f, 0.0f);
+        else
+            material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
         Renderer::SetMaterial(material);
         Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
             XMMatrixTranslation(center.x, center.y, center.z));
@@ -528,6 +548,7 @@ void TileMap::Draw()
     // Stairs marker: a flat gold square
     material.TextureEnable = FALSE;
     material.Diffuse = XMFLOAT4(0.88f, 0.66f, 0.23f, 1.0f);
+    material.Emission = XMFLOAT4(0.35f, 0.25f, 0.08f, 0.0f);    // visible even in the dark
     Renderer::SetMaterial(material);
     Renderer::SetWorldMatrix(XMMatrixScaling(0.8f, 1.0f, 0.8f) *
         XMMatrixTranslation(m_StairsX + 0.5f, 0.02f, m_StairsZ + 0.5f));

@@ -52,9 +52,11 @@
     <ClCompile Include="Prompts.cpp" />
     <ClCompile Include="renderer.cpp" />
     <ClCompile Include="Result.cpp" />
+    <ClCompile Include="SaveData.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
+    <ClCompile Include="Text.cpp" />
     <ClCompile Include="TileMap.cpp" />
     <ClCompile Include="Title.cpp" />
     <ClCompile Include="Tree.cpp" />
@@ -102,10 +104,12 @@
     <ClInclude Include="Prompts.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="Result.h" />
+    <ClInclude Include="SaveData.h" />
     <ClInclude Include="Scene.h" />
     <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="SpriteAtlas.h" />
+    <ClInclude Include="Text.h" />
     <ClInclude Include="TileMap.h" />
     <ClInclude Include="Title.h" />
     <ClInclude Include="Tree.h" />

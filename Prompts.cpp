@@ -15,6 +15,8 @@
 #include "ClassSelect.h"
 #include "GameState.h"
 #include "DebugUI.h"
+#include "SaveData.h"
+#include "Text.h"
 #include <cmath>
 
 #include "imgui/imgui.h"
@@ -88,7 +90,7 @@ void Prompts::Update()
             m_DeathTimer += dt;
             if (m_DeathTimer >= 0.9f)
             {
-                BestFloor() = std::max(BestFloor(), map->GetFloor());
+                SaveData::RecordRunEnd(player->GetClass(), map->GetFloor());   // +1 run, deepest floor
                 m_State = State::Death;
             }
         }
@@ -130,7 +132,7 @@ void Prompts::Descend()
     player->Heal((int)ceilf(player->GetMaxHp() * 0.15f));
     map->Generate(map->GetSeed(), map->GetFloor() + 1);
     player->SetPosition(map->GetStartPosition());
-    BestFloor() = std::max(BestFloor(), map->GetFloor());
+    SaveData::RecordFloor(player->GetClass(), map->GetFloor());
     Manager::AddGameObj<Fade>()->Init(false, nullptr);      // fade in on the new floor
 
     DebugUI::Log("Floor %d. The air feels more hostile.", map->GetFloor());
@@ -140,6 +142,12 @@ void Prompts::Descend()
 
 void Prompts::RestartRun(bool sameClass)
 {
+    // Restarting a live run also counts as a finished run (the death screen counted already)
+    Player* player = Manager::GetGameObj<Player>();
+    TileMap* map = Manager::GetGameObj<TileMap>();
+    if (m_State == State::Restart && player && map)
+        SaveData::RecordRunEnd(player->GetClass(), map->GetFloor());
+
     m_State = State::None;
     m_Leaving = true;
     if (sameClass)
@@ -156,18 +164,19 @@ void Prompts::DrawStairs()
     if (BeginPrompt("stairs", 460.0f, 230.0f))
     {
         char title[48];
-        snprintf(title, sizeof(title), "Stairs to floor %d", map->GetFloor() + 1);
+        snprintf(title, sizeof(title), Tr("Stairs to floor %d"), map->GetFloor() + 1);
         Title(title);
 
         const int left = map->GetBlocksLeft();
-        if (left > 0)
-            ImGui::TextWrapped("%d block%s still unbroken here. That's mining XP you'd leave behind. "
-                "Monsters below hit harder.", left, left > 1 ? "s" : "");
+        if (left > 1)
+            ImGui::TextWrapped(Tr("%d blocks still unbroken here. That's mining XP you'd leave behind. Monsters below hit harder."), left);
+        else if (left == 1)
+            ImGui::TextWrapped("%s", Tr("1 block still unbroken here. That's mining XP you'd leave behind. Monsters below hit harder."));
         else
-            ImGui::TextWrapped("This floor is mined out. Monsters below hit harder.");
+            ImGui::TextWrapped("%s", Tr("This floor is mined out. Monsters below hit harder."));
         ImGui::Spacing();
 
-        const int choice = TwoButtons("Stay and mine  [1]", "Descend  [2]");
+        const int choice = TwoButtons(Tr("Stay and mine  [1]"), Tr("Descend  [2]"));
         if (choice == 1 || Input::GetKeyTrigger('1'))
         {
             m_State = State::None;
@@ -187,21 +196,21 @@ void Prompts::DrawRestart()
 
     if (BeginPrompt("restart", 480.0f, 260.0f))
     {
-        Title("Restart this run?");
+        Title(Tr("Restart this run?"));
         const int cardCount = cards ? cards->TotalOwned() : 0;
-        ImGui::TextWrapped("Your run (%s, floor %d, Mining Lv%d, %d card%s) will be lost.",
-            kClass[(int)player->GetClass()].name, map->GetFloor(),
-            player->GetMineLevel(), cardCount, cardCount == 1 ? "" : "s");
+        ImGui::TextWrapped(Tr("Your run (%s, floor %d, Mining Lv%d, %d cards) will be lost."),
+            Tr(kClass[(int)player->GetClass()].name), map->GetFloor(),
+            player->GetMineLevel(), cardCount);
         ImGui::Spacing();
 
-        const int choice = TwoButtons("Same class", "New class");
+        const int choice = TwoButtons(Tr("Same class"), Tr("New class"));
         if (choice != 0)
         {
             RestartRun(choice == 1);
             EndPrompt();
             return;
         }
-        if (ImGui::Button("Keep playing  [Esc]", ImVec2(-1.0f, 40.0f)) || Input::GetKeyTrigger(VK_ESCAPE))
+        if (ImGui::Button(Tr("Keep playing  [Esc]"), ImVec2(-1.0f, 40.0f)) || Input::GetKeyTrigger(VK_ESCAPE))
             m_State = State::None;
     }
     EndPrompt();
@@ -216,18 +225,22 @@ void Prompts::DrawDeath()
     if (BeginPrompt("death", 520.0f, 300.0f))
     {
         char title[64];
-        snprintf(title, sizeof(title), "Slain by the %s", player->GetKilledBy());
+        snprintf(title, sizeof(title), Tr("Slain by the %s"), Tr(player->GetKilledBy()));
         Title(title, ImVec4(0.82f, 0.33f, 0.31f, 1.0f));
 
-        ImGui::Text("%s  -  floor %d  -  Mining Lv%d", kClass[(int)player->GetClass()].name,
+        ImGui::Text(Tr("%s  -  floor %d  -  Mining Lv%d"), Tr(kClass[(int)player->GetClass()].name),
             map->GetFloor(), player->GetMineLevel());
-        ImGui::Text("%d kills   %d blocks   %d cards", player->GetKills(), player->GetBlocksBroken(),
+        ImGui::Text(Tr("%d kills   %d blocks   %d cards"), player->GetKills(), player->GetBlocksBroken(),
             cards ? cards->TotalOwned() : 0);
-        ImGui::TextColored(ImVec4(0.44f, 0.86f, 0.92f, 1.0f), "Deepest run: floor %d", BestFloor());
+        const SaveData::RecordsData& records = SaveData::Records();
+        ImGui::TextColored(ImVec4(0.44f, 0.86f, 0.92f, 1.0f), Tr("Deepest run: floor %d  (%s: floor %d)"),
+            records.deepestFloor, Tr(kClass[(int)player->GetClass()].name),
+            records.deepestByClass[(int)player->GetClass()]);
+        ImGui::TextDisabled(Tr("Runs: %d"), records.runs);
         ImGui::Spacing();
         ImGui::Spacing();
 
-        const int choice = TwoButtons("Retry same class", "Choose a new class");
+        const int choice = TwoButtons(Tr("Retry same class"), Tr("Choose a new class"));
         if (choice != 0)
         {
             RestartRun(choice == 1);

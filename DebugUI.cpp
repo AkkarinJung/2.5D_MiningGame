@@ -12,6 +12,7 @@
 #include "Monsters.h"
 #include "ClassData.h"
 #include "Cards.h"
+#include "Text.h"
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
@@ -47,6 +48,22 @@ void DebugUI::Init()
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
+    // Fonts: ImGui's default font, plus a Japanese Windows font merged in for kana and kanji
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->AddFontDefault();
+    const char* const japaneseFonts[] = { "C:\\Windows\\Fonts\\YuGothM.ttc",
+                                          "C:\\Windows\\Fonts\\meiryo.ttc",
+                                          "C:\\Windows\\Fonts\\msgothic.ttc" };
+    for (const char* path : japaneseFonts)
+    {
+        if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES)
+            continue;
+        ImFontConfig config;
+        config.MergeMode = true;
+        io.Fonts->AddFontFromFileTTF(path, 13.0f, &config);     // same base size as the default font
+        break;
+    }
+
     ImGui_ImplWin32_Init(GetWindow());
     ImGui_ImplDX11_Init(Renderer::GetDevice(), Renderer::GetDeviceContext());
 }
@@ -69,7 +86,7 @@ void DebugUI::Log(const char* format, ...)
 
     va_list args;
     va_start(args, format);
-    vsnprintf(line, kLogWidth, format, args);
+    vsnprintf(line, kLogWidth, Tr(format), args);    // lines keep the language they were written in
     va_end(args);
 
     OutputDebugStringA(line);
@@ -78,6 +95,18 @@ void DebugUI::Log(const char* format, ...)
     g_LogHead = (g_LogHead + 1) % kLogLines;
     if (g_LogCount < kLogLines)
         g_LogCount++;
+}
+
+int DebugUI::LogCount()
+{
+    return g_LogCount;
+}
+
+const char* DebugUI::LogLine(int index)
+{
+    if (index < 0 || index >= g_LogCount)
+        return "";
+    return g_Log[(g_LogHead - 1 - index + kLogLines) % kLogLines];
 }
 
 void DebugUI::BeginFrame()
@@ -302,6 +331,8 @@ void DebugUI::Draw()
             // ---- Render
             if (ImGui::CollapsingHeader("Render"))
             {
+                if (ImGui::Button(LanguageButtonLabel()))
+                    ToggleLanguage();
                 ImGui::ColorEdit3("Clear colour", Renderer::GetClearColor());
                 ImGui::Checkbox("ImGui demo window", &g_ShowDemo);
             }
@@ -324,17 +355,4 @@ void DebugUI::Draw()
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
-
-int DebugUI::LogCount()
-{
-    return g_LogCount;
-}
-
-const char* DebugUI::LogLine(int index)
-{
-    if (index < 0 || index >= g_LogCount)
-        return "";
-    return g_Log[(g_LogHead - 1 - index + kLogLines) % kLogLines];
-}
-
 

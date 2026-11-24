@@ -11,6 +11,7 @@
 #include "TileMap.h"
 #include "Monsters.h"
 #include "GameState.h"
+#include "Text.h"
 #include "DebugUI.h"
 #include <cmath>
 #include <algorithm>
@@ -577,7 +578,7 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
 
     if (m.hp > 0.0f)
         return false;
-    DebugUI::Log("You defeated the %s.", def.name);
+    DebugUI::Log("You defeated the %s.", Tr(def.name));
     if (player)
         player->OnKill();               // Leech
     if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)

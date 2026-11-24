@@ -16,6 +16,7 @@
 #include "Projectiles.h"
 #include "Cards.h"
 #include "GameState.h"
+#include "Text.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -519,11 +520,11 @@ void Player::MineTile(int x, int z, float power)
 
     if (result.tooHard)
         DebugUI::Log("Too hard! %s needs mining Lv%d",
-            kOre[result.grade].name, kOre[result.grade].requiredLevel);
+            Tr(kOre[result.grade].name), kOre[result.grade].requiredLevel);
     if (result.broken)
     {
         DebugUI::Log("You dug out %s. (%d blocks left)",
-            kOre[result.grade].name, map->GetBlocksLeft());
+            Tr(kOre[result.grade].name), map->GetBlocksLeft());
         m_BlocksBroken++;
         GainMiningXp(kOre[result.grade].xp * m_MiningXpScale, result.grade);  // Miner: 1.5x
 
@@ -585,11 +586,11 @@ bool Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
     if (camera)
         camera->Shake(Vector3(0.12f, 0.0f, 0.12f));
 
-    DebugUI::Log("The %s hits you for %d. (HP %d/%d)", source, damage, std::max(0, m_Hp), m_MaxHp);
+    DebugUI::Log("The %s hits you for %d. (HP %d/%d)", Tr(source), damage, std::max(0, m_Hp), m_MaxHp);
     if (IsDead())
     {
         m_KilledBy = source;
-        DebugUI::Log("Slain by the %s...", source);
+        DebugUI::Log("Slain by the %s...", Tr(source));
     }
     return true;
 }

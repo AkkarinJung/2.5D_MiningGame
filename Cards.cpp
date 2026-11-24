@@ -12,6 +12,7 @@
 #include "OreData.h"
 #include "GameState.h"
 #include "DebugUI.h"
+#include "Text.h"
 #include <algorithm>
 
 #include "imgui/imgui.h"
@@ -121,7 +122,7 @@ void Cards::Choose(int slot)
         return;
     const CardDef& c = kCard[m_Hand[slot]];
     Grant(c.id);
-    DebugUI::Log("Took %s.", c.name);
+    DebugUI::Log("Took %s.", Tr(c.name));
 
     m_Pending.erase(m_Pending.begin());     // tiny queue; erase at the front is fine
     m_HandOpen = false;
@@ -153,20 +154,18 @@ void Cards::Update()
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 
     ImGui::PushFont(NULL, 26.0f);
-    ImGui::TextColored(ImVec4(0.73f, 0.88f, 0.48f, 1.0f), "Mining Lv%d! Choose a card", pick.level);
+    ImGui::TextColored(ImVec4(0.73f, 0.88f, 0.48f, 1.0f), Tr("Mining Lv%d! Choose a card"), pick.level);
     ImGui::PopFont();
     ImGui::PushFont(NULL, 18.0f);
-    ImGui::Text("You levelled up on");
-    ImGui::SameLine();
-    ImGui::TextColored(ImVec4(ore.r, ore.g, ore.b, 1.0f), "%s", ore.name);
-    ImGui::SameLine();
-    ImGui::Text(". Better ore means rarer cards. Keep one.");
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ore.r, ore.g, ore.b, 1.0f));
+    ImGui::TextWrapped(Tr("You levelled up on %s. Better ore means rarer cards. Keep one."), Tr(ore.name));
+    ImGui::PopStyleColor();
     for (int r = 0; r < 3; r++)
     {
         if (r > 0)
             ImGui::SameLine();
         ImGui::TextColored(ImVec4(kRarityColor[r][0], kRarityColor[r][1], kRarityColor[r][2], 1.0f),
-            "%s %d%%   ", kRarityName[r], (int)(m_Odds[r] * 100.0f + 0.5f));
+            "%s %d%%   ", Tr(kRarityName[r]), (int)(m_Odds[r] * 100.0f + 0.5f));
     }
     ImGui::Spacing();
 
@@ -180,21 +179,21 @@ void Cards::Update()
             ImGui::PushID(i);
 
             if (c.onlyFor >= 0)
-                ImGui::TextColored(ImVec4(rc[0], rc[1], rc[2], 1.0f), "%s - %s only   [%d]",
-                    kRarityName[(int)c.rarity], kClass[c.onlyFor].name, i + 1);
+                ImGui::TextColored(ImVec4(rc[0], rc[1], rc[2], 1.0f), Tr("%s - %s only   [%d]"),
+                    Tr(kRarityName[(int)c.rarity]), Tr(kClass[c.onlyFor].name), i + 1);
             else
-                ImGui::TextColored(ImVec4(rc[0], rc[1], rc[2], 1.0f), "%s   [%d]", kRarityName[(int)c.rarity], i + 1);
+                ImGui::TextColored(ImVec4(rc[0], rc[1], rc[2], 1.0f), "%s   [%d]", Tr(kRarityName[(int)c.rarity]), i + 1);
 
             ImGui::PushFont(NULL, 24.0f);
-            ImGui::TextWrapped("%s", c.name);
+            ImGui::TextWrapped("%s", Tr(c.name));
             ImGui::PopFont();
-            ImGui::TextWrapped("%s", c.description);
+            ImGui::TextWrapped("%s", Tr(c.description));
             if (m_Deck[m_Hand[i]] > 0)
-                ImGui::TextDisabled("Owned x%d", m_Deck[m_Hand[i]]);
+                ImGui::TextDisabled(Tr("Owned x%d"), m_Deck[m_Hand[i]]);
 
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(rc[0] * 0.5f, rc[1] * 0.5f, rc[2] * 0.5f, 1.0f));
-            if (ImGui::Button("Take", ImVec2(-1.0f, 40.0f)))
+            if (ImGui::Button(Tr("Take"), ImVec2(-1.0f, 40.0f)))
                 Choose(i);
             ImGui::PopStyleColor();
 

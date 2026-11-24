@@ -20,10 +20,3 @@ inline bool GamePaused()
 {
     return CardPickOpen() || PromptOpen();
 }
-
-// Deepest floor reached this session (saved to disk in a later step).
-inline int& BestFloor()
-{
-    static int best = 1;
-    return best;
-}

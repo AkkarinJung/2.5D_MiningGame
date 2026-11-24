@@ -13,9 +13,11 @@
 #include "Cards.h"
 #include "OreData.h"
 #include "DebugUI.h"
+#include "Text.h"
 #include <cstring>
 
 #include "imgui/imgui.h"
+
 namespace
 {
     const ImVec4 kLamp(0.88f, 0.66f, 0.23f, 1.0f);
@@ -60,44 +62,42 @@ void Hud::Update()
     ImGui::PushFont(NULL, 18.0f);
 
     // Row 1: class, HP, potions
-    ImGui::TextColored(kLamp, "%s", cls.name);
+    ImGui::TextColored(kLamp, "%s", Tr(cls.name));
     ImGui::SameLine(90.0f);
     char text[64];
-    snprintf(text, sizeof(text), "HP %d / %d", std::max(0, player->GetHp()), player->GetMaxHp());
+    snprintf(text, sizeof(text), Tr("HP %d / %d"), std::max(0, player->GetHp()), player->GetMaxHp());
     Bar((float)player->GetHp() / player->GetMaxHp(), kBlood, 230.0f, text);
     ImGui::SameLine();
-    ImGui::Text("Potion x%d", player->GetPotions());
+    ImGui::Text(Tr("Potion x%d"), player->GetPotions());
 
     // Row 2: floor, mining level + XP, stats
-    ImGui::TextColored(kDim, "Floor");
-    ImGui::SameLine();
-    ImGui::Text("%d", map->GetFloor());
+    ImGui::Text(Tr("Floor %d"), map->GetFloor());          // Japanese: B%dF
     ImGui::SameLine(90.0f);
-    ImGui::TextColored(kDim, "Mine Lv");
+    ImGui::TextColored(kDim, "%s", Tr("Mine Lv"));
     ImGui::SameLine();
     ImGui::TextColored(kXp, "%d", player->GetMineLevel());
     ImGui::SameLine();
     const int need = MiningXpToNext(player->GetMineLevel());
     Bar(player->GetMineXp() / need, kXp, 70.0f, "");
     ImGui::SameLine();
-    ImGui::TextColored(kDim, "Atk");
+    ImGui::TextColored(kDim, "%s", Tr("Atk"));
     ImGui::SameLine();
     ImGui::Text("%.0f", player->GetAttack());
     ImGui::SameLine();
-    ImGui::TextColored(kDim, "Mine");
+    ImGui::TextColored(kDim, "%s", Tr("Mine"));
     ImGui::SameLine();
     ImGui::Text("%.0f", player->GetMinePower());
     ImGui::SameLine();
-    ImGui::TextColored(kDim, "Armor");
+    ImGui::TextColored(kDim, "%s", Tr("Armor"));
     ImGui::SameLine();
     ImGui::Text("%d", player->GetArmor());
 
     // Row 3: skill cooldown
     const float left = std::max(0.0f, player->GetSkillTimer());
     if (left > 0.0f)
-        snprintf(text, sizeof(text), "%s  %.1fs", cls.skillName, left);
+        snprintf(text, sizeof(text), "%s  %.1fs", Tr(cls.skillName), left);
     else
-        snprintf(text, sizeof(text), "%s  ready", cls.skillName);
+        snprintf(text, sizeof(text), Tr("%s  ready"), Tr(cls.skillName));
     Bar(1.0f - left / player->GetSkillCooldown(), left > 0.0f ? kDim : kGem, -1.0f, text);
 
     // Row 4+: owned cards as chips, wrapped to the panel width
@@ -112,9 +112,9 @@ void Hud::Update()
                 continue;
             char chip[48];
             if (owned > 1)
-                snprintf(chip, sizeof(chip), "%s x%d", kCard[i].name, owned);
+                snprintf(chip, sizeof(chip), "%s x%d", Tr(kCard[i].name), owned);
             else
-                snprintf(chip, sizeof(chip), "%s", kCard[i].name);
+                snprintf(chip, sizeof(chip), "%s", Tr(kCard[i].name));
 
             const float w = ImGui::CalcTextSize(chip).x;
             if (!first)
@@ -130,7 +130,7 @@ void Hud::Update()
         ImGui::PopFont();
     }
     else
-        ImGui::TextColored(kDim, "No cards yet. Each mining level-up lets you pick one.");
+        ImGui::TextColored(kDim, "%s", Tr("No cards yet. Each mining level-up lets you pick one."));
 
     ImGui::PopFont();
     ImGui::End();
@@ -151,7 +151,7 @@ void Hud::Update()
         shown++;
     }
     if (shown == 0)
-        ImGui::TextColored(kDim, "Mine ore to raise your mining level.");
+        ImGui::TextColored(kDim, "%s", Tr("Mine ore to raise your mining level."));
     ImGui::PopFont();
     ImGui::End();
 
@@ -160,8 +160,8 @@ void Hud::Update()
     ImGui::SetNextWindowBgAlpha(0.35f);
     ImGui::Begin("##hud_keys", nullptr, kOverlay | ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::PushFont(NULL, 15.0f);
-    ImGui::TextColored(kDim, "WASD move   J / Space attack & mine (hold)");
-    ImGui::TextColored(kDim, "K / Shift skill   Q potion   R restart   F1 debug");
+    ImGui::TextColored(kDim, "%s", Tr("WASD move   J / Space attack & mine (hold)"));
+    ImGui::TextColored(kDim, "%s", Tr("K / Shift skill   Q potion   R restart   F1 debug"));
     ImGui::PopFont();
     ImGui::End();
 }

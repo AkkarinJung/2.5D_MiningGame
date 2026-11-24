@@ -1,0 +1,148 @@
+# Deepvein Japanese text: English<TAB>Japanese, one per line. Keep %s / %d in the same order.
+# --- classes
+Warrior	戦士
+Miner	鉱夫
+Mage	魔法使い
+Rogue	盗賊
+Sweeps a wide arc with a sword. Tough enough to fight head-on.	剣で前方を広く薙ぎ払う。体力が高く、正面から戦える。
+A pickaxe pro. Blocks crumble in a couple of swings.	ツルハシで岩を砕く採掘のプロ。ブロックがすぐ壊れる。
+Fires magic bolts from range. Fragile, but rarely in reach.	魔法弾で遠くから撃つ。打たれ弱いが安全に削れる。
+Rapid dagger strikes. Fast on foot and crits often.	短剣の素早い連撃。足が速く、会心が出やすい。
+Whirlwind	旋風斬
+Dynamite	ダイナマイト
+Frost Nova	氷結ノヴァ
+Shadow Dash	影走り
+Spin and slash everything around you, blocks included.	周囲を一回転して斬る。ブロックも削る。
+Throw a bomb that blasts monsters and blocks alike.	爆弾を投げて、敵もブロックもまとめて吹き飛ばす。
+Damage nearby monsters and freeze them to a crawl.	周囲の敵にダメージを与え、凍らせて鈍らせる。
+Dash while invincible, cutting everything in your path.	無敵のまま突進し、通り道の敵を斬る。
+Longer invincibility after a hit	被弾後の無敵時間が長い
+4 card choices, 1.5x mining XP	カードの選択肢が4枚・採掘経験値1.5倍
+Ranged attacks	遠距離攻撃
++15% crit chance	会心率 +15%
+# --- ores and monsters
+Copper Ore	銅鉱石
+Silver Ore	銀鉱石
+Gold Ore	金鉱石
+Crystal	クリスタル
+Cave Slime	洞窟スライム
+Gloom Bat	闇コウモリ
+Goblin	ゴブリン
+Stone Brute	岩の巨人
+# --- cards
+Common	コモン
+Rare	レア
+Epic	エピック
+Heavy Arm	剛腕
++1 attack.	攻撃力+1。
+Sharp Pick	鋭いツルハシ
++2 mining. Blocks break faster.	採掘力+2。ブロックが早く壊れる。
+Tough Hide	頑丈な皮膚
++6 max HP and heal 6.	最大HP+6、HPを6回復。
+Fleet Foot	俊足
++12% move speed.	移動速度+12%。
+Quick Hands	早業
++15% attack speed.	攻撃速度+15%。
+Potion Pouch	薬袋
++2 potions. Each heals 40% of max HP.	回復薬+2。1本で最大HPの40%を回復。
+Second Wind	再起
+Heal to full right now.	今すぐHPを全回復。
+Iron Skin	鉄の肌
++1 armor. Every hit you take is 1 lower.	防御+1。受けるダメージが1減る。
+Leech	吸血
+Heal 2 HP whenever you kill a monster.	敵を倒すたびにHPを2回復。
+Keen Edge	会心の刃
++15% crit chance. Crits deal double damage.	会心率+15%。会心はダメージ2倍。
+Thorns	トゲの鎧
+Monsters that touch you take 4 damage.	触れてきた敵に4ダメージを返す。
+Broad Blade	広刃
++20% attack reach.	攻撃範囲+20%。
+Focus	集中
+-20% skill cooldown.	スキルのクールダウン-20%。
+Prospector	鉱脈探し
+Level-up cards lean rarer.	レベルアップ時にレアなカードが出やすくなる。
+Big Bomb	大型爆弾
++40% dynamite blast radius.	ダイナマイトの爆発範囲+40%。
+Twin Strike	二連撃
+30% chance for each attack to fire twice.	30%の確率で攻撃がもう1回発動する。
+Aftershock	余震
+Breaking a block deals 8 damage to monsters within 2 tiles.	ブロックを壊すと周囲2マスの敵に8ダメージ。
+Executioner	処刑人
+Instantly finish monsters below 25% HP.	HPが25%を切った敵を一撃で仕留める。
+Motherlode	大鉱脈
+From the next floor on, gold ore and crystal appear far more often.	次の階から、金鉱石とクリスタルがずっと出やすくなる。
+Sword Wave	剣気
+Every swing launches a piercing slash wave.	攻撃のたびに、敵を貫く斬撃波が飛ぶ。
+Chain Blast	連鎖爆破
+Broken blocks explode and set off the blocks around them.	壊したブロックが爆発し、周りのブロックも巻き込む。
+Split Bolt	分裂弾
+Magic bolts fire in 3 directions.	魔法弾が3方向に飛ぶ。
+Venom Blade	毒刃
+Attacks poison, dealing damage over 3 seconds.	攻撃が毒を与え、3秒間ダメージを与え続ける。
+# --- class select
+Choose your class	職業を選ぶ
+Pick a class and head down. Mine ore to level up, collect cards, and see how deep you can go.	職業を選んでダンジョンへ。鉱石を掘ってレベルを上げ、カードを集めて、どこまで深く潜れるか。
+press %d	%dキー
+HP	HP
+Attack	攻撃
+Mining	採掘
+Speed	速さ
+Skill: %s	技: %s
+Trait	特性
+Choose	選ぶ
+# --- card pick
+Mining Lv%d! Choose a card	採掘Lv%d! カードを選べ
+You levelled up on %s. Better ore means rarer cards. Keep one.	%sでレベルが上がった。良い鉱石ほどレアなカードが出やすい。持っていけるのは1枚だけ。
+%s - %s only   [%d]	%s・%s専用   [%d]
+Owned x%d	所持 ×%d
+Take	これにする
+# --- prompts
+Stairs to floor %d	B%dFへの階段
+%d blocks still unbroken here. That's mining XP you'd leave behind. Monsters below hit harder.	この階にはまだブロックが%d個残っている。降りれば、その経験値は手に入らない。下の階の敵はもっと強い。
+1 block still unbroken here. That's mining XP you'd leave behind. Monsters below hit harder.	この階にはまだブロックが1個残っている。降りれば、その経験値は手に入らない。下の階の敵はもっと強い。
+This floor is mined out. Monsters below hit harder.	この階は掘り尽くした。下の階の敵はもっと強い。
+Stay and mine  [1]	残って掘る  [1]
+Descend  [2]	降りる  [2]
+Restart this run?	リスタートしますか?
+Your run (%s, floor %d, Mining Lv%d, %d cards) will be lost.	いまの進行（%s・B%dF・採掘Lv%d・カード%d枚）は失われる。
+Same class	同じ職業で再挑戦
+New class	職業を選び直す
+Keep playing  [Esc]	続ける  [Esc]
+Slain by the %s	%sにやられた
+%s  -  floor %d  -  Mining Lv%d	%s・到達 B%dF・採掘Lv%d
+%d kills   %d blocks   %d cards	撃破 %d   採掘 %d個   カード %d枚
+Deepest run: floor %d  (%s: floor %d)	最深記録: B%dF（%s: B%dF）
+Runs: %d	挑戦回数: %d
+Retry same class	同じ職業で再挑戦
+Choose a new class	職業を選び直す
+# --- HUD
+HP %d / %d	HP %d / %d
+Potion x%d	回復薬 ×%d
+Floor %d	B%dF
+Mine Lv	採掘Lv
+Atk	攻撃
+Mine	採掘
+Armor	防御
+%s  ready	%s  使用可
+No cards yet. Each mining level-up lets you pick one.	カードはまだない。採掘レベルが上がるとカードを1枚選べる。
+Mine ore to raise your mining level.	鉱石を掘って採掘レベルを上げよう。
+WASD move   J / Space attack & mine (hold)	WASD 移動   J / Space 攻撃・採掘(長押し)
+K / Shift skill   Q potion   R restart   F1 debug	K / Shift スキル   Q 回復薬   R リスタート   F1 デバッグ
+# --- message log
+Critical!	会心!
+Executed!	処刑!
+Whirlwind!	旋風斬!
+Dynamite!	ダイナマイト!
+Frost Nova!	氷結ノヴァ!
+Shadow Dash!	影走り!
+Too hard! %s needs mining Lv%d	かたい! %sには採掘Lv%dが必要
+You dug out %s. (%d blocks left)	%sを掘り出した。（残り%d個）
+Mining Lv%d! (power %.0f)	採掘Lv%d!（採掘力 %.0f）
+The %s hits you for %d. (HP %d/%d)	%sの攻撃で%dダメージ。（HP %d/%d）
+Slain by the %s...	%sにやられた…
+Leech +%d HP	吸血 HP+%d
+You drink a potion. +%d HP (%d left)	回復薬を飲んだ。HP+%d（残り%d本）
+Picked up a red potion. (%d)	赤い回復薬を拾った。（%d本）
+You defeated the %s.	%sを倒した。
+Took %s.	「%s」を手に入れた。
+Floor %d. The air feels more hostile.	B%dF に到着。敵の気配が濃くなった。

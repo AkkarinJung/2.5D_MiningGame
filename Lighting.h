@@ -33,6 +33,8 @@ namespace Lighting
     void Flash(float x, float y, float z, float radius, uint32_t rgb, float intensity);
 
     void Upload();                  // start of Manager::Draw: pick the 16 nearest, fill the buffer
+    float FocusX();                 // where SetFocus put the player (the shadow box follows it)
+    float FocusZ();
 
     float Flicker(float seed);      // ~1.0 with a slight wobble (1.0 when flicker is off)
     Settings& GetSettings();

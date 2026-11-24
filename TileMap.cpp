@@ -556,3 +556,34 @@ void TileMap::Draw()
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(4, 0);
 }
+
+// Shadow pass (M8): walls and ore blocks, depth only (no pixel shader).
+void TileMap::DrawShadow()
+{
+    ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+    ctx->IASetInputLayout(m_VertexLayout);
+    ctx->VSSetShader(m_VertexShader, NULL, 0);
+    ctx->PSSetShader(nullptr, NULL, 0);
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    UINT stride = sizeof(VERTEX_3D);
+    UINT offset = 0;
+
+    if (m_WallVB)
+    {
+        Renderer::SetWorldMatrix(XMMatrixIdentity());
+        ctx->IASetVertexBuffers(0, 1, &m_WallVB, &stride, &offset);
+        ctx->Draw(m_WallVertexCount, 0);
+    }
+
+    ctx->IASetVertexBuffers(0, 1, &m_CubeVB, &stride, &offset);
+    for (int i = 0; i < W * H; i++)
+    {
+        if (m_Tiles[i] != Tile::Block)
+            continue;
+        const float damage = std::min(1.0f, m_BlockDamage[i] / m_BlockHp[i]);
+        const float size = 0.8f * (1.0f - damage * 0.18f);
+        Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
+            XMMatrixTranslation(i % W + 0.5f, size * 0.5f, i / W + 0.5f));
+        ctx->Draw(m_CubeVertexCount, 0);
+    }
+}

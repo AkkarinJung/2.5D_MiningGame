@@ -184,6 +184,8 @@ namespace Lighting
     }
 
     Settings& GetSettings() { return g_Settings; }
+    float FocusX() { return g_FocusX; }
+    float FocusZ() { return g_FocusZ; }
     int LightsRequested() { return g_Requested; }
     int LightsUsed() { return g_Used; }
 }

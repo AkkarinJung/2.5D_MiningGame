@@ -15,6 +15,7 @@
 #include "Text.h"
 #include "SaveData.h"
 #include "Lighting.h"
+#include "ShadowMap.h"
 #include <shellapi.h>
 
 #include "imgui/imgui.h"
@@ -352,6 +353,24 @@ void DebugUI::Draw()
                     const Vector3 p = player->GetPosition();
                     Lighting::Flash(p.x, 1.2f, p.z, 6.0f, 0xffa050, 5.0f);
                 }
+            }
+
+            // ---- Shadows (M8)
+            if (ImGui::CollapsingHeader("Shadows"))
+            {
+                ShadowMap::Settings& ss = ShadowMap::GetSettings();
+                ImGui::Checkbox("Shadows on", &ss.enabled);
+                ImGui::SameLine();
+                ImGui::Checkbox("3x3 PCF", &ss.pcf);
+                ImGui::SliderFloat("Bias", &ss.bias, 0.0f, 0.01f, "%.4f");
+                ImGui::SliderFloat("Slope bias", &ss.slopeBias, 0.0f, 6.0f, "%.2f");
+                ImGui::SliderFloat("Box half size", &ss.boxHalfSize, 6.0f, 40.0f, "%.1f");
+                ImGui::SliderFloat3("Moon direction", ss.moonDir, -12.0f, 12.0f, "%.1f");
+                ImGui::ColorEdit3("Moon colour", ss.moonColor);
+                ImGui::SliderFloat("Moon intensity", &ss.moonIntensity, 0.0f, 2.0f, "%.2f");
+                ImGui::SliderFloat("Ambient in shadow", &ss.shadowedAmbient, 0.0f, 1.0f, "%.2f");
+                ImGui::TextDisabled("Shadow map (depth, red = far):");
+                ImGui::Image((ImTextureID)(intptr_t)ShadowMap::GetSRV(), ImVec2(192.0f, 192.0f));
             }
 
             // ---- Save

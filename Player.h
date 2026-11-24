@@ -114,6 +114,7 @@ public:
     void Uninit() override;
     void Update() override;
     void Draw() override;
+    void DrawShadow() override;     // the character model (M8)
 
     void UpdateGround();
     void UpdateAttack();

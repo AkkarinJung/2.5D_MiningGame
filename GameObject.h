@@ -84,6 +84,10 @@ public:
 			component->Update();
 		}
 	};
+
+	// Shadow pass (M8): draw depth only, as seen from the moon. Most objects cast no shadow.
+	virtual void DrawShadow() {}
+
 	virtual void Draw() 
 	{
 		// マトリクス設定

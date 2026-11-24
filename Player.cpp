@@ -355,6 +355,20 @@ void Player::Draw()
     GameObject::Draw();
 }
 
+// Shadow pass (M8): the character model, depth only. Uses last frame's animated pose.
+void Player::DrawShadow()
+{
+    if (m_Invincible > 0.0f && m_DashTime <= 0.0f && !IsDead() && ((int)(m_Invincible * 14.0f) % 2) == 1)
+        return;     // blinking: no shadow on the hidden frames either
+
+    ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+    ctx->IASetInputLayout(m_VertexLayout);
+    ctx->VSSetShader(m_VertexShader, NULL, 0);
+    ctx->PSSetShader(nullptr, NULL, 0);
+    Renderer::SetWorldMatrix(GetMatrx());
+    m_AnimationModel->Draw();
+}
+
 void Player::SetAnimation(const char* AnimationName)
 {
     if (m_NextAnimationName != AnimationName)

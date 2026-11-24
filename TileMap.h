@@ -65,6 +65,7 @@ public:
     void Uninit() override;
     void Update() override;
     void Draw() override;
+    void DrawShadow() override;     // walls and ore blocks (M8)
 
     void Generate(uint32_t seed, int floorNo);
 

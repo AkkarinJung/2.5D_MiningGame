@@ -64,6 +64,7 @@ private:
     ID3D11InputLayout*  m_LitLayout = nullptr;      // M7: sprites lit by the lamp and crystals
     ID3D11VertexShader* m_LitVS = nullptr;
     ID3D11PixelShader*  m_LitPS = nullptr;
+    ID3D11PixelShader*  m_ShadowPS = nullptr;       // M8: alpha-tested depth for sprite shadows
     ID3D11ShaderResourceView* m_Atlas = nullptr;
     ID3D11SamplerState* m_PointSampler = nullptr;
 
@@ -85,6 +86,7 @@ public:
     void Uninit() override;
     void Update() override;
     void Draw() override;
+    void DrawShadow() override;     // sprite silhouettes (M8)
 
     void Spawn(MonsterType type, float x, float z);
 

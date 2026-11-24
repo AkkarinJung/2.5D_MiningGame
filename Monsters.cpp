@@ -72,6 +72,7 @@ void Monsters::Init()
     Renderer::CreatePixelShader(&m_PixelShader, "shader\\unlitTexturePS.cso");     // HP bars
     Renderer::CreateVertexShader(&m_LitVS, &m_LitLayout, "shader\\pointLitVS.cso");  // sprites (M7)
     Renderer::CreatePixelShader(&m_LitPS, "shader\\pointLitPS.cso");
+    Renderer::CreatePixelShader(&m_ShadowPS, "shader\\shadowAlphaPS.cso");          // shadow pass (M8)
 
     // Sprite atlas: every 8x8 sprite (monsters, then the potion) side by side in one texture.
     const int atlasW = 8 * kSpriteCount, atlasH = 8;
@@ -149,6 +150,7 @@ void Monsters::Uninit()
     SafeRelease(m_LitLayout);
     SafeRelease(m_LitVS);
     SafeRelease(m_LitPS);
+    SafeRelease(m_ShadowPS);
     SafeRelease(m_Atlas);
     SafeRelease(m_PointSampler);
 
@@ -824,4 +826,50 @@ void Monsters::Draw()
     ctx->PSSetSamplers(0, 1, &oldSampler);
     if (oldSampler)
         oldSampler->Release();          // PSGetSamplers added a reference
+}
+
+// Shadow pass (M8): monsters and potions as alpha-tested quads, so their silhouettes
+// cast shadows. They face the camera (last frame's view), exactly as they are drawn.
+void Monsters::DrawShadow()
+{
+    Camera* camera = Manager::GetGameObj<Camera>();
+    if (!camera || (m_List.empty() && m_Potions.empty()))
+        return;
+
+    ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+    ctx->IASetInputLayout(m_LitLayout);
+    ctx->VSSetShader(m_LitVS, NULL, 0);
+    ctx->PSSetShader(m_ShadowPS, NULL, 0);
+    ctx->PSSetShaderResources(0, 1, &m_Atlas);
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    ID3D11SamplerState* oldSampler = nullptr;
+    ctx->PSGetSamplers(0, 1, &oldSampler);
+    ctx->PSSetSamplers(0, 1, &m_PointSampler);
+
+    XMMATRIX invView = XMMatrixInverse(nullptr, camera->GetViewMatrix());
+    invView.r[3] = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+    UINT stride = sizeof(VERTEX_3D);
+    UINT offset = 0;
+
+    for (const Monster& m : m_List)
+    {
+        const MonsterDef& def = kMonster[(int)m.type];
+        const float y = m.type == MonsterType::Bat ? 0.45f + sinf(m_Time * 11.0f + m.phase) * 0.08f : 0.0f;
+        Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height, 1.0f) *
+            invView * XMMatrixTranslation(m.x, y, m.z));
+        ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
+        ctx->Draw(4, 0);
+    }
+    ctx->IASetVertexBuffers(0, 1, &m_QuadVB[kMonsterTypeCount], &stride, &offset);
+    for (const Potion& potion : m_Potions)
+    {
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.55f, 0.55f, 1.0f) *
+            invView * XMMatrixTranslation(potion.x, 0.05f, potion.z));
+        ctx->Draw(4, 0);
+    }
+
+    ctx->PSSetSamplers(0, 1, &oldSampler);
+    if (oldSampler)
+        oldSampler->Release();
 }

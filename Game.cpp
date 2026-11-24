@@ -17,6 +17,7 @@
 #include "Prompts.h"
 #include "Hud.h"
 #include "GameState.h"
+#include "SaveData.h"
 
 void Game::Init()
 {
@@ -43,6 +44,12 @@ void Game::Update()
     Player* player = Manager::GetGameObj<Player>();
     if (!map || !player)
         return;
+    // Any new floor (stairs, G key, debug "Next floor") updates the deepest-floor records
+    if (map->GetFloor() != m_RecordedFloor)
+    {
+        m_RecordedFloor = map->GetFloor();
+        SaveData::RecordFloor(player->GetClass(), m_RecordedFloor);
+    }
     if (player->IsDead() || GamePaused())
         return;                                 // death screen, card pick or prompt open
 

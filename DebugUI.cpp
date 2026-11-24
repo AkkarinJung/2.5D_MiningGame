@@ -13,6 +13,8 @@
 #include "ClassData.h"
 #include "Cards.h"
 #include "Text.h"
+#include "SaveData.h"
+#include <shellapi.h>
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
@@ -325,6 +327,24 @@ void DebugUI::Draw()
                 {
                     player->GainMiningXp((float)MiningXpToNext(player->GetMineLevel()) - player->GetMineXp(), 3);
                     Log("[debug] forced a level-up (crystal odds)");
+                }
+            }
+
+            // ---- Save
+            if (ImGui::CollapsingHeader("Save"))
+            {
+                const SaveData::RecordsData& r = SaveData::Records();
+                ImGui::Text("Deepest floor %d    runs %d", r.deepestFloor, r.runs);
+                ImGui::Text("By class: Warrior %d  Miner %d  Mage %d  Rogue %d",
+                            r.deepestByClass[0], r.deepestByClass[1], r.deepestByClass[2], r.deepestByClass[3]);
+                ImGui::TextWrapped("Last: %s", SaveData::LastStatus());
+                if (ImGui::Button("Open save folder"))
+                    ShellExecuteW(nullptr, L"open", SaveData::Folder(), nullptr, nullptr, SW_SHOWNORMAL);
+                ImGui::SameLine();
+                if (ImGui::Button("Reset records"))
+                {
+                    SaveData::ResetRecords();
+                    Log("[debug] records reset");
                 }
             }
 

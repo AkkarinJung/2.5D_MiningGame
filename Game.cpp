@@ -15,8 +15,8 @@
 #include "Result.h"
 #include "Cards.h"
 #include "Prompts.h"
-#include "GameState.h"
 #include "Hud.h"
+#include "GameState.h"
 
 void Game::Init()
 {

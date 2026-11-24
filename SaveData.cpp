@@ -19,6 +19,15 @@ namespace
     SaveData::SettingsData g_Settings;
     SaveData::RecordsData  g_Records;
     std::wstring g_Folder;
+    char g_Status[160] = "not loaded yet";
+
+    void SetStatus(const char* text)
+    {
+        strncpy_s(g_Status, text, _TRUNCATE);
+        OutputDebugStringA("Deepvein save: ");
+        OutputDebugStringA(text);
+        OutputDebugStringA("\n");
+    }
 
     const char* const kClassKey[kClassCount] = { "warrior", "miner", "mage", "rogue" };
 
@@ -33,6 +42,8 @@ namespace
             CoTaskMemFree(path);
             CreateDirectoryW(g_Folder.c_str(), nullptr);    // fine if it already exists
         }
+        else
+            SetStatus("ERROR: could not find %LOCALAPPDATA%");
         return g_Folder;
     }
 
@@ -53,16 +64,31 @@ namespace
     }
 
     // Write to name.tmp, then replace the real file in one step.
-    void WriteFileSafely(const std::wstring& path, const std::string& text)
+    bool WriteFileSafely(const std::wstring& path, const std::string& text)
     {
         const std::wstring tmp = path + L".tmp";
         {
             std::ofstream file(tmp.c_str(), std::ios::binary | std::ios::trunc);
             if (!file)
-                return;
+            {
+                SetStatus("ERROR: could not create the .tmp save file");
+                return false;
+            }
             file << text;
+            if (!file)
+            {
+                SetStatus("ERROR: could not write the .tmp save file");
+                return false;
+            }
         }
-        MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+        if (!MoveFileExW(tmp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            char msg[96];
+            sprintf_s(msg, "ERROR: could not replace the save file (Windows error %lu)", GetLastError());
+            SetStatus(msg);
+            return false;
+        }
+        return true;
     }
 
     void KeepBadFile(const std::wstring& path)
@@ -97,7 +123,12 @@ namespace
         for (int i = 0; i < kClassCount; i++)
             s << "\"" << kClassKey[i] << "\": " << g_Records.deepestByClass[i] << (i + 1 < kClassCount ? ", " : " ");
         s << "},\n  \"runs\": " << g_Records.runs << "\n}\n";
-        WriteFileSafely(FilePath(L"records.json"), s.str());
+        if (WriteFileSafely(FilePath(L"records.json"), s.str()))
+        {
+            char msg[96];
+            sprintf_s(msg, "saved records.json (deepest floor %d, runs %d)", g_Records.deepestFloor, g_Records.runs);
+            SetStatus(msg);
+        }
     }
 }
 
@@ -132,10 +163,20 @@ namespace SaveData
             for (int i = 0; ok && byClass != std::string::npos && i < kClassCount; i++)
                 ReadInt(text, kClassKey[i], r.deepestByClass[i], byClass);
             if (ok)
+            {
                 g_Records = r;
+                char msg[96];
+                sprintf_s(msg, "loaded records.json (deepest floor %d, runs %d)", r.deepestFloor, r.runs);
+                SetStatus(msg);
+            }
             else
+            {
                 KeepBadFile(recordsPath);
+                SetStatus("records.json was unreadable: renamed to .bak, starting fresh");
+            }
         }
+        else
+            SetStatus("no records.json yet (it is written on a new deepest floor, death or restart)");
     }
 
     SettingsData& Settings()
@@ -153,7 +194,8 @@ namespace SaveData
         std::string text = "{\n  \"version\": 1,\n  \"language\": \"";
         text += g_Settings.language == Language::Japanese ? "ja" : "en";
         text += "\"\n}\n";
-        WriteFileSafely(FilePath(L"settings.json"), text);
+        if (WriteFileSafely(FilePath(L"settings.json"), text))
+            SetStatus(g_Settings.language == Language::Japanese ? "saved settings.json (ja)" : "saved settings.json (en)");
     }
 
     void RecordFloor(PlayerClass cls, int floor)
@@ -177,6 +219,23 @@ namespace SaveData
     {
         g_Records.runs++;
         RecordFloor(cls, floor);
+        SaveRecords();
+    }
+
+    const wchar_t* Folder()
+    {
+        SaveFolder();                   // fills g_Folder the first time
+        return g_Folder.c_str();
+    }
+
+    const char* LastStatus()
+    {
+        return g_Status;
+    }
+
+    void ResetRecords()
+    {
+        g_Records = RecordsData();
         SaveRecords();
     }
 }

@@ -28,5 +28,10 @@ namespace SaveData
 
     void RecordFloor(PlayerClass cls, int floor);   // reached a floor: update deepest records
     void RecordRunEnd(PlayerClass cls, int floor);  // died or restarted: +1 run
+
+    // For the F1 panel
+    const wchar_t* Folder();        // %LOCALAPPDATA%\Deepvein
+    const char* LastStatus();       // what the last load / save did
+    void ResetRecords();
 }
 

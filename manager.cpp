@@ -11,6 +11,7 @@
 #include "SaveData.h"
 #include "Text.h"
 #include "Lighting.h"
+#include "ShadowMap.h"
 
 #include "GameObject.h"
 
@@ -24,6 +25,7 @@ void Manager::Init()
 {
 	Renderer::Init();
 	Lighting::Init();           // point-light constant buffer (b6)
+	ShadowMap::Init();          // moon shadow map (t1, s1, b7)
 	DebugUI::Init();
 	SaveData::Load();          // settings + records from %LOCALAPPDATA%\Deepvein
 	LoadTranslations();        // asset\text\ja.txt
@@ -50,6 +52,7 @@ void Manager::Uninit()
 
 	DebugUI::Uninit();
 	Audio::UninitMaster();
+	ShadowMap::Uninit();
 	Lighting::Uninit();
 	Renderer::Uninit();
 	Input::Uninit();
@@ -113,6 +116,13 @@ void Manager::Draw()
 {
 	Renderer::Begin();
 	Lighting::Upload();         // nearest 16 lights -> shader
+
+	// Shadow pass (M8): everything that casts a shadow draws its depth from the moon
+	ShadowMap::BeginPass(Lighting::FocusX(), Lighting::FocusZ());
+	for (GameObject* obj : m_GameObjects)
+		obj->DrawShadow();
+	ShadowMap::EndPass();
+
 	Camera* camera = GetGameObj<Camera>();
 	if (camera)
 	{

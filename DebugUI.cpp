@@ -325,3 +325,16 @@ void DebugUI::Draw()
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 }
 
+int DebugUI::LogCount()
+{
+    return g_LogCount;
+}
+
+const char* DebugUI::LogLine(int index)
+{
+    if (index < 0 || index >= g_LogCount)
+        return "";
+    return g_Log[(g_LogHead - 1 - index + kLogLines) % kLogLines];
+}
+
+

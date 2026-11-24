@@ -123,6 +123,7 @@ public:
     int GetMineLevel() const { return m_MineLevel; }
     float GetMineXp() const { return m_MineXp; }
     float GetMinePower() const { return m_MinePower; }
+    float GetAttack() const { return m_Attack; }
 
     bool TakeDamage(int amount, float fromX, float fromZ, const char* source);// true if it hurt
     void HealFull() { m_Hp = m_MaxHp; }

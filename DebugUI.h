@@ -13,5 +13,9 @@ public:
 
     static void Log(const char* format, ...);   // printf-style, also goes to VS Output
     static bool WantsKeyboard();    // true while typing in / dragging a debug widget
+
+    // The message log, newest first (index 0 = newest). Used by the HUD.
+    static int LogCount();
+    static const char* LogLine(int index);
 };
 

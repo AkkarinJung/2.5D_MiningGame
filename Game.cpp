@@ -16,6 +16,7 @@
 #include "Cards.h"
 #include "Prompts.h"
 #include "GameState.h"
+#include "Hud.h"
 
 void Game::Init()
 {
@@ -29,9 +30,7 @@ void Game::Init()
     Manager::AddGameObj<Cards>();      // after Player, so a level-up opens its pick the same frame
     Manager::AddGameObj<Prompts>();    // stairs, restart (R) and death screen
 
-    Score* level = Manager::AddGameObj<Score>();   // top-left number = mining level (until the HUD exists)
-    level->SetPosition({ 20.0f, 20.0f, 0.0f });
-    level->SetScore(1);
+    Manager::AddGameObj<Hud>();        // HP, floor, mining level, skill, potions, cards, log
 
     Manager::AddGameObj<Fade>()->Init(false, nullptr);
 }

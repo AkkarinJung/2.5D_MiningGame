@@ -1,14 +1,14 @@
 #pragma once
 // CardData.h: every level-up card from the Deepvein prototype as a data table.
 // The effect of each card is one case in Player::ApplyCard; the numbers and text live here.
-// (Bright Lamp is left out until lighting exists in M7.)
+// Bright Lamp makes the M7 lamp (light and lamp shadows) reach further.
 
 #include "ClassData.h"
 #include <cstdint>
 
 enum class CardId : uint8_t
 {
-    HeavyArm, SharpPick, ToughHide, FleetFoot, QuickHands, PotionPouch, SecondWind,
+    HeavyArm, SharpPick, ToughHide, FleetFoot, QuickHands, BrightLamp, PotionPouch, SecondWind,
     IronSkin, Leech, KeenEdge, Thorns, BroadBlade, Focus, Prospector, BigBomb,
     TwinStrike, Aftershock, Executioner, Motherlode, SwordWave, ChainBlast, SplitBolt, VenomBlade,
     Count
@@ -36,6 +36,7 @@ static const CardDef kCard[kCardCount] =
     { CardId::ToughHide,   "Tough Hide",    "+6 max HP and heal 6.",                                  Rarity::Common, 0, false, -1 },
     { CardId::FleetFoot,   "Fleet Foot",    "+12% move speed.",                                       Rarity::Common, 3, false, -1 },
     { CardId::QuickHands,  "Quick Hands",   "+15% attack speed.",                                     Rarity::Common, 3, false, -1 },
+    { CardId::BrightLamp,  "Bright Lamp",   "Your lamp reaches further.",                         Rarity::Common, 3, false, -1 },
     { CardId::PotionPouch, "Potion Pouch",  "+2 potions. Each heals 40% of max HP.",                  Rarity::Common, 0, false, -1 },
     { CardId::SecondWind,  "Second Wind",   "Heal to full right now.",                                Rarity::Common, 0, true,  -1 },
 

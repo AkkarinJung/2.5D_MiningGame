@@ -43,6 +43,8 @@ Fleet Foot	俊足
 +12% move speed.	移動速度+12%。
 Quick Hands	早業
 +15% attack speed.	攻撃速度+15%。
+Bright Lamp	明るいランプ
+Your lamp reaches further.	ランプの光が遠くまで届く。
 Potion Pouch	薬袋
 +2 potions. Each heals 40% of max HP.	回復薬+2。1本で最大HPの40%を回復。
 Second Wind	再起

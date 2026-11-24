@@ -59,6 +59,7 @@ private:
     float m_Invincible = 0.0f;
     bool  m_GodMode = false;
     int   m_Potions = 1;        // start with 1
+    float m_LampBonus = 0.0f;   // Bright Lamp card: extra lamp radius
 
     // Class (M5): filled from kClass in Init
     PlayerClass m_Class = PlayerClass::Miner;

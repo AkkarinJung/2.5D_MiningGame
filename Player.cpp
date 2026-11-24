@@ -98,7 +98,7 @@ void Player::Update()
     {
         const Lighting::Settings& ls = Lighting::GetSettings();
         Lighting::SetFocus(m_Position.x, m_Position.z);
-        Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius, 0xffb866,
+        Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius + m_LampBonus, 0xffb866,
                           ls.lampIntensity * Lighting::Flicker(0.0f));   // light 0, casts shadows
     }
 
@@ -646,6 +646,7 @@ void Player::ApplyCard(CardId id)
     case CardId::ToughHide:   m_MaxHp += 6; m_Hp = std::min(m_MaxHp, m_Hp + 6); break;
     case CardId::FleetFoot:   m_Speed *= 1.12f; break;
     case CardId::QuickHands:  m_AttackSpeed += 0.15f; break;
+    case CardId::BrightLamp:  m_LampBonus += 1.8f; break;     // the prototype's +1.8 lamp reach per copy
     case CardId::PotionPouch: m_Potions += 2; break;
     case CardId::SecondWind:  m_Hp = m_MaxHp; break;
     case CardId::IronSkin:    m_Armor += 1; break;

@@ -12,9 +12,9 @@ namespace Lighting
     struct Settings
     {
         bool  enabled = true;
-        float ambient[3] = { 0.17f, 0.15f, 0.21f };    // cool purple dark, from the prototype
-        float lampRadius = 7.0f;
-        float lampIntensity = 2.2f;
+        float ambient[3] = { 0.025f, 0.02f, 0.035f };  // almost black: only lights reveal the cave
+        float lampRadius = 3.0f;
+        float lampIntensity = 2.6f;
         bool  flicker = true;                          // juice: on/off + strength
         float flickerStrength = 1.0f;
         bool  fog = true;

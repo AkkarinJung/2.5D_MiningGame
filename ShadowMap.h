@@ -20,8 +20,8 @@ namespace ShadowMap
         float boxHalfSize = 18.0f;          // tiles around the player covered by the map
         float moonDir[3] = { 4.0f, -10.0f, 6.0f };      // direction the moonlight travels
         float moonColor[3] = { 0.44f, 0.53f, 0.69f };
-        float moonIntensity = 0.45f;
-        float shadowedAmbient = 0.7f;       // ambient light kept inside shadows (0..1)
+        float moonIntensity = 0.08f;      // faint: just enough to hint at walls in the dark
+        float shadowedAmbient = 0.5f;       // ambient light kept inside shadows (0..1)
 
         // Lamp shadows (omnidirectional, cube map)
         bool  lampShadows = true;

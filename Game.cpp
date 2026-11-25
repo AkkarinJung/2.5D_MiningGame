@@ -16,6 +16,7 @@
 #include "Cards.h"
 #include "Prompts.h"
 #include "Hud.h"
+#include "Juice.h"
 #include "GameState.h"
 #include "SaveData.h"
 
@@ -28,6 +29,7 @@ void Game::Init()
 
     Manager::AddGameObj<Monsters>();
     Manager::AddGameObj<Projectiles>();
+    Manager::AddGameObj<Juice>();      // debris, damage numbers, hit-stop, shake
     Manager::AddGameObj<Cards>();      // after Player, so a level-up opens its pick the same frame
     Manager::AddGameObj<Prompts>();    // stairs, restart (R) and death screen
 

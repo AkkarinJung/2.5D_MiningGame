@@ -16,9 +16,16 @@ inline bool& PromptOpen()
 }
 
 // Player, Monsters and Projectiles skip their update while this is true; drawing continues.
+// Hit-stop (juice): seconds left of a short freeze on big hits (set by Juice)
+inline float& HitStopTimer()
+{
+    static float seconds = 0.0f;
+    return seconds;
+}
+
 inline bool GamePaused()
 {
-    return CardPickOpen() || PromptOpen();
+    return CardPickOpen() || PromptOpen() || HitStopTimer() > 0.0f;
 }
 
 // Deepest floor reached this session (saved to disk in a later step).

@@ -9,6 +9,7 @@
 #include "TileMap.h"
 #include "OreData.h"
 #include "Lighting.h"
+#include "Juice.h"
 #include <random>
 #include <cmath>
 #include <algorithm>
@@ -156,6 +157,13 @@ void TileMap::Uninit()
 
 void TileMap::Update()
 {
+    // Juice: hit blocks wobble for a moment
+    const float dt = 1.0f / 60.0f;
+    m_Time += dt;
+    for (float& s : m_BlockShake)
+        if (s > 0.0f)
+            s -= dt;
+
     // Fog of war: upload the visibility worked out last frame and bind it (t3, s2) for pointLitPS
     UploadFog();
     if (m_FogSRV)
@@ -353,6 +361,7 @@ void TileMap::PlaceOre(uint32_t seed, int floorNo)
     m_OreGrade.assign(W * H, 0);
     m_BlockHp.assign(W * H, 0.0f);
     m_BlockDamage.assign(W * H, 0.0f);
+    m_BlockShake.assign(W * H, 0.0f);
     m_BlocksLeft = 0;
 
     std::vector<int> open;
@@ -463,6 +472,7 @@ MineResult TileMap::MineBlock(int x, int z, float power, int mineLevel)
     }
 
     m_BlockDamage[i] += power;
+    m_BlockShake[i] = 0.15f;            // juice: wobble
     if (m_BlockDamage[i] >= m_BlockHp[i])
     {
         m_Tiles[i] = Tile::Floor;
@@ -547,7 +557,8 @@ void TileMap::Draw()
         const int x = i % W, z = i / W;
         const float damage = std::min(1.0f, m_BlockDamage[i] / m_BlockHp[i]);
         const float size = 0.8f * (1.0f - damage * 0.18f);
-        const Vector3 center(x + 0.5f, size * 0.5f, z + 0.5f);
+        const float wobble = WobbleOffset(i);
+        const Vector3 center(x + 0.5f + wobble, size * 0.5f, z + 0.5f - wobble * 0.6f);
 
         const OreDef& ore = kOre[m_OreGrade[i]];
         material.Diffuse = XMFLOAT4(ore.r, ore.g, ore.b, 1.0f);
@@ -602,7 +613,7 @@ void TileMap::DrawShadow()
         const float damage = std::min(1.0f, m_BlockDamage[i] / m_BlockHp[i]);
         const float size = 0.8f * (1.0f - damage * 0.18f);
         Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
-            XMMatrixTranslation(i % W + 0.5f, size * 0.5f, i / W + 0.5f));
+            XMMatrixTranslation(i % W + 0.5f + WobbleOffset(i), size * 0.5f, i / W + 0.5f));
         ctx->Draw(m_CubeVertexCount, 0);
     }
 }
@@ -726,4 +737,13 @@ void TileMap::UploadFog()
         }
         ctx->Unmap(m_FogTexture, 0);
     }
+}
+
+// Juice: a block that was just hit shakes sideways for 0.15 s (strength from the F1 panel).
+float TileMap::WobbleOffset(int i) const
+{
+    const Juice::Settings& js = Juice::GetSettings();
+    if (!js.wobble || m_BlockShake.empty() || m_BlockShake[i] <= 0.0f)
+        return 0.0f;
+    return sinf(m_Time * 90.0f + i) * 0.05f * js.wobbleStrength * (m_BlockShake[i] / 0.15f);
 }

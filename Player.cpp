@@ -19,6 +19,7 @@
 #include "Text.h"
 #include "Lighting.h"
 #include "ShadowMap.h"
+#include "Juice.h"
 #include "Tree.h"
 #include "Box.h"
 #include "Shadow.h"
@@ -395,7 +396,8 @@ void Player::SetAnimation(const char* AnimationName)
 float Player::RollDamage(float base)
 {
     static std::mt19937 rng(std::random_device{}());
-    if (std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < m_Crit)
+    m_LastCrit = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) < m_Crit;
+    if (m_LastCrit)
     {
         DebugUI::Log("Critical!");
         return base * 2.0f;
@@ -499,7 +501,7 @@ void Player::UseSkill()
         if (projectiles)
             projectiles->AddRing(x, z, 1.9f * m_Area, 0xfff3b0, 0.3f);
         if (camera)
-            camera->Shake(Vector3(0.15f, 0.0f, 0.15f));
+            Juice::Shake(0.15f);
         DebugUI::Log("Whirlwind!");
         break;
     }
@@ -552,11 +554,20 @@ void Player::MineTile(int x, int z, float power)
     if (!result.hit)
         return;
 
+    const OreDef& ore = kOre[result.grade];
+    const uint32_t oreRgb = ((uint32_t)(ore.r * 255.0f) << 16) | ((uint32_t)(ore.g * 255.0f) << 8) | (uint32_t)(ore.b * 255.0f);
+
     if (result.tooHard)
+    {
         DebugUI::Log("Too hard! %s needs mining Lv%d",
             Tr(kOre[result.grade].name), kOre[result.grade].requiredLevel);
+        Juice::TooHard(x, z, ore.requiredLevel);
+    }
+    if (!result.broken)
+        Juice::BlockHit(x, z, oreRgb);
     if (result.broken)
     {
+        Juice::BlockBreak(x, z, oreRgb, result.grade, (int)roundf(ore.xp * m_MiningXpScale));
         DebugUI::Log("You dug out %s. (%d blocks left)",
             Tr(kOre[result.grade].name), map->GetBlocksLeft());
         m_BlocksBroken++;
@@ -589,6 +600,7 @@ void Player::GainMiningXp(float xp, int oreGrade)
         m_MinePower += 1.0f;
 
         DebugUI::Log("Mining Lv%d! (power %.0f)", m_MineLevel, m_MinePower);
+        Juice::LevelUp(m_Position.x, m_Position.z, m_MineLevel);
         if (cards)
             cards->QueueLevelUp(oreGrade, m_MineLevel);     // card pick, odds from this ore
     }
@@ -618,7 +630,7 @@ bool Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
 
     Camera* camera = Manager::GetGameObj<Camera>();
     if (camera)
-        camera->Shake(Vector3(0.12f, 0.0f, 0.12f));
+        Juice::PlayerHurt(m_Position.x, m_Position.z, damage);   // red number, debris, shake
 
     DebugUI::Log("The %s hits you for %d. (HP %d/%d)", Tr(source), damage, std::max(0, m_Hp), m_MaxHp);
     if (IsDead())
@@ -638,6 +650,7 @@ void Player::OnKill()
         const int heal = std::min(m_Leech, m_MaxHp - m_Hp);
         m_Hp += heal;
         DebugUI::Log("Leech +%d HP", heal);
+        Juice::Heal(m_Position.x, m_Position.z, heal);
     }
 }
 
@@ -691,4 +704,5 @@ void Player::DrinkPotion()
     m_Hp += heal;
     m_Potions--;
     DebugUI::Log("You drink a potion. +%d HP (%d left)", heal, m_Potions);
+    Juice::Heal(m_Position.x, m_Position.z, heal);
 }

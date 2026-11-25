@@ -14,6 +14,7 @@
 #include "SpriteAtlas.h"
 #include "GameState.h"
 #include "Lighting.h"
+#include "Juice.h"
 #include <cmath>
 #include <algorithm>
 
@@ -192,9 +193,7 @@ void Projectiles::Explode(float x, float z, float radius, float damage, float mi
     AddRing(x, z, radius, 0xffb35a);
     Lighting::Flash(x, 1.2f, z, radius * 4.0f, 0xffa050, 5.0f);     // M7: explosion flash
 
-    Camera* camera = Manager::GetGameObj<Camera>();
-    if (camera)
-        camera->Shake(Vector3(0.25f, 0.0f, 0.25f));
+    Juice::Explosion(x, z);                         // debris, shake, hit-stop
 
     Monsters* monsters = Manager::GetGameObj<Monsters>();
     if (monsters)

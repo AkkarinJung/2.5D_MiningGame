@@ -12,6 +12,7 @@
 #include "Monsters.h"
 #include "GameState.h"
 #include "Text.h"
+#include "Juice.h"
 #include "DebugUI.h"
 #include <cmath>
 #include <algorithm>
@@ -557,12 +558,14 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
     Player* player = Manager::GetGameObj<Player>();
 
     float dealt = (float)std::max(1, (int)roundf(damage));
+    bool executed = false;
     if (attack && player)
     {
         // Executioner: a hit that would leave it under 25% HP kills it instead
         if (player->IsExecutioner() && m.hp - dealt > 0.0f && (m.hp - dealt) / m.maxHp < 0.25f)
         {
             dealt = m.hp;
+            executed = true;
             DebugUI::Log("Executed!");
         }
         if (player->HasVenom())
@@ -572,6 +575,8 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
         }
     }
     m.hp -= dealt;
+    Juice::MonsterHit(m.x, def.height, m.z, (int)roundf(dealt),
+                      attack && player && player->LastAttackWasCrit(), executed, !attack);
     m.flash = 0.1f;
     m.awake = true;
 
@@ -586,6 +591,7 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
     if (m.hp > 0.0f)
         return false;
     DebugUI::Log("You defeated the %s.", Tr(def.name));
+    Juice::MonsterKilled(m.x, m.z);
     if (player)
         player->OnKill();               // Leech
     if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)

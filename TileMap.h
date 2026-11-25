@@ -32,6 +32,8 @@ private:
     std::vector<uint8_t> m_OreGrade;    // valid where the tile is Block
     std::vector<float>   m_BlockHp;
     std::vector<float>   m_BlockDamage;
+    std::vector<float>   m_BlockShake;  // juice: seconds of wobble left after a hit
+    float m_Time = 0.0f;
     int m_BlocksLeft = 0;
     bool m_Motherlode = false;          // card: more gold and crystal on later floors
 
@@ -73,6 +75,7 @@ private:
     void BuildWallMesh();
     bool CanSee(float ax, float az, int tx, int tz) const;
     void UploadFog();
+    float WobbleOffset(int i) const;    // sideways shake of a block that was just hit
 
 public:
     void Init() override;

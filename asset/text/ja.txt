@@ -148,3 +148,6 @@ Picked up a red potion. (%d)	赤い回復薬を拾った。（%d本）
 You defeated the %s.	%sを倒した。
 Took %s.	「%s」を手に入れた。
 Floor %d. The air feels more hostile.	B%dF に到着。敵の気配が濃くなった。
++%d XP	+%d 経験値
+Mining Lv%d!	採掘Lv%d!
+Too hard! Lv%d	かたい! Lv%d

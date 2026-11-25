@@ -60,6 +60,7 @@ private:
     bool  m_GodMode = false;
     int   m_Potions = 1;        // start with 1
     float m_LampBonus = 0.0f;   // Bright Lamp card: extra lamp radius
+    bool  m_LastCrit = false;   // the last RollDamage was a crit (for yellow damage numbers)
 
     // Class (M5): filled from kClass in Init
     PlayerClass m_Class = PlayerClass::Miner;
@@ -138,6 +139,7 @@ public:
     void DrinkPotion();
 
     PlayerClass GetClass() const { return m_Class; }
+    bool LastAttackWasCrit() const { return m_LastCrit; }
 
     // Mine the block on (x, z) with this power; handles "too hard", logging and XP.
     void MineTile(int x, int z, float power);

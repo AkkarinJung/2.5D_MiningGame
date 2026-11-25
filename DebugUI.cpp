@@ -16,6 +16,7 @@
 #include "SaveData.h"
 #include "Lighting.h"
 #include "ShadowMap.h"
+#include "Juice.h"
 #include <shellapi.h>
 
 #include "imgui/imgui.h"
@@ -330,6 +331,32 @@ void DebugUI::Draw()
                     player->GainMiningXp((float)MiningXpToNext(player->GetMineLevel()) - player->GetMineXp(), 3);
                     Log("[debug] forced a level-up (crystal odds)");
                 }
+            }
+
+            // ---- Juice
+            if (ImGui::CollapsingHeader("Juice"))
+            {
+                Juice::Settings& js = Juice::GetSettings();
+                auto row = [](const char* name, bool* on, float* strength, float maxValue)
+                {
+                    ImGui::PushID(name);
+                    ImGui::Checkbox(name, on);
+                    if (strength)
+                    {
+                        ImGui::SameLine(150.0f);
+                        ImGui::SetNextItemWidth(-1.0f);
+                        ImGui::SliderFloat("##strength", strength, 0.0f, maxValue, "%.2f");
+                    }
+                    ImGui::PopID();
+                };
+                row("Hit-stop", &js.hitStop, &js.hitStopStrength, 2.0f);
+                row("Screen shake", &js.shake, &js.shakeStrength, 3.0f);
+                row("Damage numbers", &js.numbers, &js.numberSize, 2.0f);
+                row("Debris", &js.debris, &js.debrisAmount, 3.0f);
+                row("Block wobble", &js.wobble, &js.wobbleStrength, 3.0f);
+                row("Dust ring", &js.dustRing, nullptr, 0.0f);
+                row("Level-up burst", &js.levelUpBurst, nullptr, 0.0f);
+                ImGui::Text("Particles: %d / 320", Juice::ParticleCount());
             }
 
             // ---- Lighting (M7)

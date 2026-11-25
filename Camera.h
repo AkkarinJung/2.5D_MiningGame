@@ -17,6 +17,7 @@ public:
 	void Draw()override;
 
 	XMMATRIX GetViewMatrix() { return m_ViewMatrix; }
+	XMMATRIX GetProjectionMatrix() { return m_projection; }   // for damage numbers (screen position)
 
 	Vector3 GetFoward()override
 	{

@@ -23,7 +23,7 @@ namespace Lighting
 
         // Fog of war: unseen tiles are black, seen tiles stay dim, visible tiles are lit
         bool  fogOfWar = true;
-        float viewExtra = 2.0f;                        // view radius = lamp radius + this
+        float viewExtra = 0.0f;                        // view radius = lamp radius + this
         float seenBrightness = 0.2f;                   // remembered but out of sight
     };
 

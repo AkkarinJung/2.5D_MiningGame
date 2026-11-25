@@ -333,6 +333,13 @@ void Projectiles::Draw()
     if (!camera || (m_Bolts.empty() && m_Waves.empty() && m_Bombs.empty() && m_Rings.empty()))
         return;
 
+    // Fog of war: these are drawn unlit, so the shader cannot hide them; skip the ones out of sight
+    const TileMap* map = Manager::GetGameObj<TileMap>();
+    auto hidden = [map](float x, float z)
+        {
+            return map && !map->IsVisible((int)floorf(x), (int)floorf(z));
+        };
+
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
     ctx->IASetInputLayout(m_VertexLayout);
     ctx->VSSetShader(m_VertexShader, NULL, 0);
@@ -360,6 +367,8 @@ void Projectiles::Draw()
     ctx->IASetVertexBuffers(0, 1, &m_BoltVB, &stride, &offset);
     for (const Bolt& b : m_Bolts)
     {
+        if (hidden(b.x, b.z))
+            continue;
         Renderer::SetWorldMatrix(XMMatrixScaling(0.4f, 0.4f, 1.0f) * invView *
             XMMatrixTranslation(b.x, 0.35f, b.z));
         ctx->Draw(4, 0);
@@ -370,6 +379,8 @@ void Projectiles::Draw()
     Renderer::SetMaterial(material);
     for (const Wave& w : m_Waves)
     {
+        if (hidden(w.x, w.z))
+            continue;
         Renderer::SetWorldMatrix(XMMatrixScaling(0.9f, 0.35f, 1.0f) * invView *
             XMMatrixTranslation(w.x, 0.25f, w.z));
         ctx->Draw(4, 0);
@@ -380,7 +391,7 @@ void Projectiles::Draw()
     ctx->IASetVertexBuffers(0, 1, &m_BombVB, &stride, &offset);
     for (const Bomb& b : m_Bombs)
     {
-        if (!b.visible)
+        if (!b.visible || hidden(b.x, b.z))
             continue;
         Renderer::SetWorldMatrix(XMMatrixScaling(0.5f, 0.5f, 1.0f) * XMMatrixRotationZ(m_Time * 12.0f) *
             invView * XMMatrixTranslation(b.x, b.y, b.z));
@@ -397,6 +408,8 @@ void Projectiles::Draw()
     ctx->IASetVertexBuffers(0, 1, &m_RingVB, &stride, &offset);
     for (const Ring& r : m_Rings)
     {
+        if (hidden(r.x, r.z))
+            continue;
         const float k = r.t / r.life;
         const float d = r.radius * 2.0f * (0.3f + 0.7f * k);
         material.Diffuse = XMFLOAT4(r.r, r.g, r.b, 1.0f - k);

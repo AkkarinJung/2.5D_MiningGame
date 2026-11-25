@@ -243,6 +243,12 @@ namespace ShadowMap
         ctx->UpdateSubresource(g_Buffer, 0, nullptr, &cb, 0, 0);
     }
 
+    bool MoonShadowsActive()
+    {
+        return g_Settings.enabled && g_Settings.moonIntensity > 0.0f;
+    }
+
+
     bool LampShadowsActive()
     {
         return g_LampActive;

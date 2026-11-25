@@ -23,6 +23,7 @@ public:
         bool  shake = true;          float shakeStrength = 1.0f;
         bool  numbers = true;        float numberSize = 1.0f;
         bool  debris = true;         float debrisAmount = 1.0f;
+        float debrisSize = 0.06f;    // edge length of a chunk in tiles
         bool  wobble = true;         float wobbleStrength = 1.0f;
         bool  dustRing = true;
         bool  levelUpBurst = true;

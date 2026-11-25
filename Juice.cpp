@@ -124,7 +124,7 @@ namespace
         for (int i = 0; i < g_ParticleCount; i++)
         {
             const Particle& p = g_Particles[i];
-            const float size = 0.11f * std::min(1.0f, p.life / 0.3f);     // shrink away at the end
+            const float size = g_Settings.debrisSize * std::min(1.0f, p.life / 0.3f);   // shrink away at the end
             if (!shadowPass)
             {
                 material.Diffuse = XMFLOAT4(p.r, p.g, p.b, 1.0f);
@@ -363,9 +363,10 @@ void Juice::Update()
         p.y += p.vy * dt;
         p.z += p.vz * dt;
         p.angle += p.spin * dt;
-        if (p.y < 0.055f)
+        const float halfSize = g_Settings.debrisSize * 0.5f;
+        if (p.y < halfSize)                         // bounce when the chunk touches the floor
         {
-            p.y = 0.055f;
+            p.y = halfSize;
             p.vy *= -0.35f;
             p.vx *= 0.55f;
             p.vz *= 0.55f;

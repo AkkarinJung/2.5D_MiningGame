@@ -353,6 +353,8 @@ void DebugUI::Draw()
                 row("Screen shake", &js.shake, &js.shakeStrength, 3.0f);
                 row("Damage numbers", &js.numbers, &js.numberSize, 2.0f);
                 row("Debris", &js.debris, &js.debrisAmount, 3.0f);
+                ImGui::SetNextItemWidth(-1.0f);
+                ImGui::SliderFloat("##debrisSize", &js.debrisSize, 0.02f, 0.2f, "Debris size %.2f");
                 row("Block wobble", &js.wobble, &js.wobbleStrength, 3.0f);
                 row("Dust ring", &js.dustRing, nullptr, 0.0f);
                 row("Level-up burst", &js.levelUpBurst, nullptr, 0.0f);
@@ -392,21 +394,11 @@ void DebugUI::Draw()
                 }
             }
 
-            // ---- Shadows (M8)
+            // ---- Shadows: the lamp is the main shadow caster; the moon is optional and faint
             if (ImGui::CollapsingHeader("Shadows"))
             {
                 ShadowMap::Settings& ss = ShadowMap::GetSettings();
-                ImGui::Checkbox("Shadows on", &ss.enabled);
-                ImGui::SameLine();
-                ImGui::Checkbox("3x3 PCF", &ss.pcf);
-                ImGui::SliderFloat("Bias", &ss.bias, 0.0f, 0.01f, "%.4f");
-                ImGui::SliderFloat("Slope bias", &ss.slopeBias, 0.0f, 6.0f, "%.2f");
-                ImGui::SliderFloat("Box half size", &ss.boxHalfSize, 6.0f, 40.0f, "%.1f");
-                ImGui::SliderFloat3("Moon direction", ss.moonDir, -12.0f, 12.0f, "%.1f");
-                ImGui::ColorEdit3("Moon colour", ss.moonColor);
-                ImGui::SliderFloat("Moon intensity", &ss.moonIntensity, 0.0f, 2.0f, "%.2f");
-                ImGui::SliderFloat("Ambient in shadow", &ss.shadowedAmbient, 0.0f, 1.0f, "%.2f");
-                ImGui::Separator();
+
                 ImGui::Checkbox("Lamp shadows (cube map, 6 extra passes)", &ss.lampShadows);
                 const int sizes[3] = { 256, 512, 1024 };
                 const char* sizeNames[3] = { "256", "512", "1024" };
@@ -414,10 +406,25 @@ void DebugUI::Draw()
                 if (ImGui::Combo("Lamp face size", &sizeIndex, sizeNames, 3))
                     ss.lampFaceSize = sizes[sizeIndex];
                 ImGui::SliderFloat("Lamp bias", &ss.lampBias, 0.0f, 0.15f, "%.3f");
-                ImGui::Separator();
-                ImGui::TextDisabled("Shadow map (depth, red = far):");
-                ImGui::Image((ImTextureID)(intptr_t)ShadowMap::GetSRV(), ImVec2(192.0f, 192.0f));
+                ImGui::SliderFloat("Slope bias (all shadows)", &ss.slopeBias, 0.0f, 6.0f, "%.2f");
+
+                if (ImGui::TreeNode("Moon (faint light from above, off by default)"))
+                {
+                    ImGui::Checkbox("Moon shadows", &ss.enabled);
+                    ImGui::SameLine();
+                    ImGui::Checkbox("3x3 PCF", &ss.pcf);
+                    ImGui::SliderFloat("Moon intensity", &ss.moonIntensity, 0.0f, 2.0f, "%.2f");
+                    ImGui::SliderFloat3("Moon direction", ss.moonDir, -12.0f, 12.0f, "%.1f");
+                    ImGui::ColorEdit3("Moon colour", ss.moonColor);
+                    ImGui::SliderFloat("Ambient in shadow", &ss.shadowedAmbient, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("Moon bias", &ss.bias, 0.0f, 0.01f, "%.4f");
+                    ImGui::SliderFloat("Box half size", &ss.boxHalfSize, 6.0f, 40.0f, "%.1f");
+                    ImGui::TextDisabled("Moon shadow map (depth, red = far):");
+                    ImGui::Image((ImTextureID)(intptr_t)ShadowMap::GetSRV(), ImVec2(160.0f, 160.0f));
+                    ImGui::TreePop();
+                }
             }
+
 
             // ---- Save
             if (ImGui::CollapsingHeader("Save"))

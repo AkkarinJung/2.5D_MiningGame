@@ -13,7 +13,7 @@ namespace ShadowMap
 {
     struct Settings
     {
-        bool  enabled = true;
+        bool  enabled = false;              // moon shadows: off by default (the moon is faint since the darker lighting)
         bool  pcf = true;                   // 3x3 soft edges
         float bias = 0.0015f;               // compare bias in the shader (raise if you see acne)
         float slopeBias = 1.5f;             // rasterizer slope-scaled bias in the shadow pass
@@ -37,6 +37,7 @@ namespace ShadowMap
     //   for face 0..5 while LampShadowsActive(): BeginLampFace(face) -> every DrawShadow()
     //   EndPass                                     (back to the screen, maps bound for drawing)
     void BeginPass(float focusX, float focusZ); // save the screen state, moon view/projection
+    bool MoonShadowsActive();               // moon shadows on and the moon bright enough to matter
     bool LampShadowsActive();               // lamp shadows on and the player has a lamp this frame
     void BeginLampFace(int face);           // render into one cube face, camera at the lamp
     bool IsLampPass();                      // true between BeginLampFace and EndPass (Player skips itself)

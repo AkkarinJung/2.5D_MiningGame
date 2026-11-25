@@ -117,10 +117,10 @@ void Manager::Draw()
 	Renderer::Begin();
 	Lighting::Upload();         // nearest 16 lights -> shader
 
-	// Shadow pass (M8): everything that casts a shadow draws its depth from the moon
 	ShadowMap::BeginPass(Lighting::FocusX(), Lighting::FocusZ());
-	for (GameObject* obj : m_GameObjects)
-		obj->DrawShadow();
+	if (ShadowMap::MoonShadowsActive())         // skipped when moon shadows are off (saves a pass)
+		for (GameObject* obj : m_GameObjects)
+			obj->DrawShadow();
 	// Lamp shadows: the same casters again, once for each of the 6 cube faces around the lamp
 	if (ShadowMap::LampShadowsActive())
 		for (int face = 0; face < 6; face++)

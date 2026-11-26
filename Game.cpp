@@ -8,11 +8,8 @@
 #include "Player.h"
 #include "Fade.h"
 #include "GameObject.h"
-#include "Score.h"
-#include <random>
 #include "Monsters.h"
 #include "Projectiles.h"
-#include "Result.h"
 #include "Cards.h"
 #include "Prompts.h"
 #include "Hud.h"
@@ -55,13 +52,6 @@ void Game::Update()
     if (player->IsDead() || GamePaused())
         return;                                 // death screen, card pick or prompt open
 
-    // G: brand-new random floor (for testing until the F1 debug panel exists)
-    if (Input::GetKeyTrigger('G'))
-    {
-        map->Generate(std::random_device{}(), 1);
-        player->SetPosition(map->GetStartPosition());
-    }
-    // The stairs are handled by Prompts (stay or descend)
 }
 
 void Game::Draw() {}

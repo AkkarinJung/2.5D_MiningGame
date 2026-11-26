@@ -27,7 +27,6 @@
     <ClCompile Include="ClassSelect.cpp" />
     <ClCompile Include="Collision.cpp" />
     <ClCompile Include="DebugUI.cpp" />
-    <ClCompile Include="Enemy.cpp" />
     <ClCompile Include="Explosion.cpp" />
     <ClCompile Include="Fade.cpp" />
     <ClCompile Include="field.cpp" />
@@ -53,10 +52,8 @@
     <ClCompile Include="Projectiles.cpp" />
     <ClCompile Include="Prompts.cpp" />
     <ClCompile Include="renderer.cpp" />
-    <ClCompile Include="Result.cpp" />
     <ClCompile Include="SaveData.cpp" />
     <ClCompile Include="Scene.cpp" />
-    <ClCompile Include="Score.cpp" />
     <ClCompile Include="Shadow.cpp" />
     <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="Text.cpp" />
@@ -77,7 +74,6 @@
     <ClInclude Include="component.h" />
     <ClInclude Include="DebugUI.h" />
     <ClInclude Include="DirectXTex\DirectXTex.h" />
-    <ClInclude Include="Enemy.h" />
     <ClInclude Include="Explosion.h" />
     <ClInclude Include="Fade.h" />
     <ClInclude Include="field.h" />
@@ -108,10 +104,8 @@
     <ClInclude Include="Projectiles.h" />
     <ClInclude Include="Prompts.h" />
     <ClInclude Include="renderer.h" />
-    <ClInclude Include="Result.h" />
     <ClInclude Include="SaveData.h" />
     <ClInclude Include="Scene.h" />
-    <ClInclude Include="Score.h" />
     <ClInclude Include="Shadow.h" />
     <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="SpriteAtlas.h" />

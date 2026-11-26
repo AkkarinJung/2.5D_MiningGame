@@ -8,7 +8,6 @@
 #include "Manager.h"
 #include "Camera.h"
 
-#include "Enemy.h"
 
 void Box::Init()
 {

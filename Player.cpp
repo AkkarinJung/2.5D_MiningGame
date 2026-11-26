@@ -11,7 +11,6 @@
 #include "audio.h"
 #include "DebugUI.h"
 
-#include "Enemy.h"
 #include "Monsters.h"
 #include "Projectiles.h"
 #include "Cards.h"
@@ -26,7 +25,6 @@
 
 #include "TileMap.h"
 #include "OreData.h"
-#include "Score.h"
 
 #include <random>
 
@@ -236,29 +234,6 @@ void Player::Update()
                 m_Velocity.x = 0.0f;
                 m_Velocity.z = 0.0f;
             }
-        }
-    }
-
-    auto enemies = Manager::GetGameObjs<Enemy>();
-
-    for (auto enemy : enemies)
-    {
-        const float playerRadius = 0.7f;
-        const float enemyRadius = 0.7f;
-
-        Vector3 dir = m_Position - enemy->GetPosition();
-        float length = dir.lenght();
-
-        if (Collision::SphereVsSphere(m_Position, playerRadius, enemy->GetPosition(), enemyRadius))
-        {
-            if (length > 0.0f)
-            {
-                float overlap = (playerRadius + enemyRadius) - length;
-                dir /= length;
-                m_Position += dir * overlap;
-            }
-
-            break;
         }
     }
 
@@ -605,9 +580,6 @@ void Player::GainMiningXp(float xp, int oreGrade)
             cards->QueueLevelUp(oreGrade, m_MineLevel);     // card pick, odds from this ore
     }
 
-    Score* level = Manager::GetGameObj<Score>();
-    if (level)
-        level->SetScore(m_MineLevel);
 }
 
 // Contact damage from a monster: armor, minimum 1, 0.6 s invincibility, knockback away.

@@ -51,9 +51,6 @@
     <ClCompile Include="input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Enemy.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Tree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -76,12 +73,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Title.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Result.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Score.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="audio.cpp">
@@ -197,9 +188,6 @@
     <ClInclude Include="input.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Enemy.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Tree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -222,12 +210,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Title.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Result.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Score.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="audio.h">

@@ -25,6 +25,13 @@ namespace Lighting
         bool  fogOfWar = true;
         float viewExtra = 0.0f;                        // view radius = lamp radius + this
         float seenBrightness = 0.2f;                   // remembered but out of sight
+
+        // Floor 0, the town (C8): daylight instead of the dark cave. The sun itself is the
+        // moon light in ShadowMap (sun settings there); the player's lamp is off.
+        float townAmbient[3] = { 0.42f, 0.395f, 0.356f };     // #fff0d8 x 0.42
+        float townFogStart = 14.0f;
+        float townFogEnd = 30.0f;
+        float townFogColor[3] = { 0.612f, 0.769f, 0.847f };   // #9cc4d8, also the clear colour
     };
 
     void Init();                    // after Renderer::Init
@@ -41,6 +48,10 @@ namespace Lighting
     void Flash(float x, float y, float z, float radius, uint32_t rgb, float intensity);
 
     void Upload();                  // start of Manager::Draw: pick the 16 nearest, fill the buffer
+    // C8: switch between the town (floor 0) and dungeon looks. TileMap calls it after
+    // every Generate, so per-frame code only asks IsTown().
+    void ApplyFloorPreset(int floor);
+    bool IsTown();
     void SetFogMap(int width, int height);  // the tile map has a fog texture bound this frame (t3, s2)
     float FocusX();                 // where SetFocus put the player (the shadow box follows it)
     float FocusZ();

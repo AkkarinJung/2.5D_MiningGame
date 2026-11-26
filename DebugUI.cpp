@@ -254,6 +254,30 @@ void DebugUI::Draw()
                     NewFloor(map, player, map->GetSeed(), map->GetFloor() + 1);
                     Log("[debug] went down to floor %d", map->GetFloor());
                 }
+                // C8: the town (floor 0) and its sun
+                if (ImGui::Button("Go to floor 0 (town)"))
+                {
+                    NewFloor(map, player, map->GetSeed(), 0);
+                    Log("[debug] went to the town");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Go to floor 1"))
+                {
+                    NewFloor(map, player, map->GetSeed(), 1);
+                    Log("[debug] went to floor 1");
+                }
+                if (map->IsTown())
+                {
+                    ShadowMap::Settings& sun = ShadowMap::GetSettings();
+                    Lighting::Settings& town = Lighting::GetSettings();
+                    ImGui::SliderFloat3("Sun direction", sun.sunDir, -30.0f, 30.0f, "%.1f");
+                    ImGui::SliderFloat("Sun intensity", &sun.sunIntensity, 0.0f, 3.0f, "%.2f");
+                    ImGui::ColorEdit3("Sun colour", sun.sunColor);
+                    ImGui::SliderFloat("Sun shadow ambient", &sun.sunShadowedAmbient, 0.0f, 1.0f, "%.2f");
+                    ImGui::ColorEdit3("Town ambient", town.townAmbient, ImGuiColorEditFlags_HDR);
+                    ImGui::ColorEdit3("Town fog / sky", town.townFogColor);
+                    ImGui::DragFloatRange2("Town fog", &town.townFogStart, &town.townFogEnd, 0.1f, 0.0f, 80.0f);
+                }
             }
 
             // ---- Monsters

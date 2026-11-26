@@ -97,8 +97,9 @@ void Player::Update()
     {
         const Lighting::Settings& ls = Lighting::GetSettings();
         Lighting::SetFocus(m_Position.x, m_Position.z);
-        Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius + m_LampBonus, 0xffb866,
-                          ls.lampIntensity * Lighting::Flicker(0.0f));   // light 0, casts shadows
+        if (!Lighting::IsTown())        // daylight in the town (floor 0): lamp off, no lamp shadows
+            Lighting::SetLamp(m_Position.x, 1.7f, m_Position.z, ls.lampRadius + m_LampBonus, 0xffb866,
+                ls.lampIntensity * Lighting::Flicker(0.0f));   // light 0, casts shadows
 
         // Fog of war: you see a little further than your lamp reaches (lamp radius + 2)
         TileMap* map = Manager::GetGameObj<TileMap>();

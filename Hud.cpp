@@ -14,6 +14,8 @@
 #include "OreData.h"
 #include "DebugUI.h"
 #include "Text.h"
+#include "Camera.h"
+#include <cfloat>
 #include <cstring>
 
 #include "imgui/imgui.h"
@@ -71,7 +73,10 @@ void Hud::Update()
     ImGui::Text(Tr("Potion x%d"), player->GetPotions());
 
     // Row 2: floor, mining level + XP, stats
-    ImGui::Text(Tr("Floor %d"), map->GetFloor());          // Japanese: B%dF
+    if (map->IsTown())
+        ImGui::TextUnformatted(Tr("Town"));
+    else
+        ImGui::Text(Tr("Floor %d"), map->GetFloor());      // Japanese: B%dF
     ImGui::SameLine(90.0f);
     ImGui::TextColored(kDim, "%s", Tr("Mine Lv"));
     ImGui::SameLine();
@@ -154,6 +159,28 @@ void Hud::Update()
         ImGui::TextColored(kDim, "%s", Tr("Mine ore to raise your mining level."));
     ImGui::PopFont();
     ImGui::End();
+
+    // ---- town (C8): "Dungeon" label floating above the gate
+    Camera* camera = Manager::GetGameObj<Camera>();
+    if (map->IsTown() && camera)
+    {
+        const Vector3 gate = map->GetStairsPosition();
+        const XMMATRIX viewProj = camera->GetViewMatrix() * camera->GetProjectionMatrix();
+        const XMVECTOR clip = XMVector3TransformCoord(XMVectorSet(gate.x, 2.45f, gate.z, 1.0f), viewProj);
+        const float cz = XMVectorGetZ(clip);
+        if (cz >= 0.0f && cz <= 1.0f)
+        {
+            const float sx = (XMVectorGetX(clip) + 1.0f) * 0.5f * SCREEN_WIDTH;
+            const float sy = (1.0f - XMVectorGetY(clip)) * 0.5f * SCREEN_HEIGHT;
+            const char* label = Tr("Dungeon");
+            const float size = 22.0f;
+            const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, label);
+            const ImVec2 pos(sx - ts.x * 0.5f, sy - ts.y * 0.5f);
+            ImDrawList* draw = ImGui::GetBackgroundDrawList();
+            draw->AddText(ImGui::GetFont(), size, ImVec2(pos.x + 1.5f, pos.y + 1.5f), IM_COL32(0, 0, 0, 180), label);
+            draw->AddText(ImGui::GetFont(), size, pos, IM_COL32(240, 200, 120, 255), label);
+        }
+    }
 
     // ---- bottom-right key help
     ImGui::SetNextWindowPos(ImVec2(SCREEN_WIDTH - 10.0f, SCREEN_HEIGHT - 10.0f), 0, ImVec2(1.0f, 1.0f));

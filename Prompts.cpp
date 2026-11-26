@@ -129,13 +129,19 @@ void Prompts::Descend()
     if (!player || !map)
         return;
 
-    player->Heal((int)ceilf(player->GetMaxHp() * 0.15f));
+    const bool fromTown = map->IsTown();
+    if (!fromTown)
+        player->Heal((int)ceilf(player->GetMaxHp() * 0.15f));
     map->Generate(map->GetSeed(), map->GetFloor() + 1);
     player->SetPosition(map->GetStartPosition());
     SaveData::RecordFloor(player->GetClass(), map->GetFloor());
     Manager::AddGameObj<Fade>()->Init(false, nullptr);      // fade in on the new floor
 
-    DebugUI::Log("Floor %d. The air feels more hostile.", map->GetFloor());
+    if (fromTown)
+        DebugUI::Log("You step into the dungeon.");
+    else
+        DebugUI::Log("Floor %d. The air feels more hostile.", map->GetFloor());
+
     m_State = State::None;
     m_StairLock = false;
 }
@@ -161,6 +167,28 @@ void Prompts::RestartRun(bool sameClass)
 void Prompts::DrawStairs()
 {
     TileMap* map = Manager::GetGameObj<TileMap>();
+    if (map->IsTown())
+    {
+        // Floor 0 (C8): the dungeon gate
+        if (BeginPrompt("gate", 460.0f, 200.0f))
+        {
+            Title(Tr("Dungeon entrance"));
+            ImGui::TextWrapped("%s", Tr("Ready? Monsters wait inside."));
+            ImGui::Spacing();
+
+            const int choice = TwoButtons(Tr("Stay in town  [1]"), Tr("Enter  [2]"));
+            if (choice == 1 || Input::GetKeyTrigger('1'))
+            {
+                m_State = State::None;
+                m_StairLock = true;
+            }
+            else if (choice == 2 || Input::GetKeyTrigger('2'))
+                Descend();
+        }
+        EndPrompt();
+        return;
+    }
+
     if (BeginPrompt("stairs", 460.0f, 230.0f))
     {
         char title[48];

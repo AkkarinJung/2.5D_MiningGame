@@ -2,6 +2,8 @@
 // Floor generation (border, 14 wall pieces, seal unreachable tiles, stairs on the
 // farthest tile, ore veins), mining, and drawing: the floor is one textured quad,
 // all walls are baked into one mesh per floor (one draw call), ore blocks are cubes.
+// Floor 0 (C8) is the town: an open grass field fenced by hedges, a ring of trees,
+// and the dungeon gate at the far (north) end, which works like the stairs.
 
 #include "main.h"
 #include "renderer.h"
@@ -81,6 +83,102 @@ namespace
     {
         if (p) { p->Release(); p = nullptr; }
     }
+
+    // A small RGBA texture made from pixels in memory (the town's grass and hedge).
+    ID3D11ShaderResourceView* CreateTextureRGBA(int w, int h, const std::vector<uint32_t>& pixels)
+    {
+        D3D11_TEXTURE2D_DESC td{};
+        td.Width = w;
+        td.Height = h;
+        td.MipLevels = 1;
+        td.ArraySize = 1;
+        td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        td.SampleDesc.Count = 1;
+        td.Usage = D3D11_USAGE_IMMUTABLE;
+        td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+        D3D11_SUBRESOURCE_DATA sd{};
+        sd.pSysMem = pixels.data();
+        sd.SysMemPitch = w * 4;
+
+        ID3D11Texture2D* texture = nullptr;
+        Renderer::GetDevice()->CreateTexture2D(&td, &sd, &texture);
+        assert(texture);
+        ID3D11ShaderResourceView* srv = nullptr;
+        Renderer::GetDevice()->CreateShaderResourceView(texture, nullptr, &srv);
+        texture->Release();                 // the view keeps the texture alive
+        assert(srv);
+        return srv;
+    }
+
+    // R8G8B8A8 in memory is bytes r, g, b, a = 0xAABBGGRR as a little-endian uint32
+    uint32_t Pixel(int r, int g, int b)
+    {
+        auto c = [](int v) { return (uint32_t)std::min(std::max(v, 0), 255); };
+        return 0xFF000000u | (c(b) << 16) | (c(g) << 8) | c(r);
+    }
+
+    // 64x64 grass: speckled greens and a few small flowers (fixed seed: same every run)
+    std::vector<uint32_t> MakeGrassPixels()
+    {
+        const int n = 64;
+        std::mt19937 rng(1234u);
+        std::uniform_int_distribution<int> jitter(-14, 14);
+        std::vector<uint32_t> px(n * n);
+        for (int i = 0; i < n * n; i++)
+        {
+            const int v = jitter(rng);
+            const bool dark = (rng() % 7) == 0;
+            px[i] = dark ? Pixel(70 + v, 128 + v, 52 + v) : Pixel(96 + v, 164 + v, 70 + v);
+        }
+        const uint32_t petals[3] = { Pixel(250, 248, 236), Pixel(250, 222, 90), Pixel(240, 150, 190) };
+        for (int f = 0; f < 9; f++)
+        {
+            const int x = rng() % (n - 1), y = rng() % (n - 1);
+            const uint32_t c = petals[f % 3];
+            px[y * n + x] = c; px[y * n + x + 1] = c; px[(y + 1) * n + x] = c; px[(y + 1) * n + x + 1] = c;
+        }
+        return px;
+    }
+
+    // 32x32 hedge: dark leafy greens
+    std::vector<uint32_t> MakeHedgePixels()
+    {
+        const int n = 32;
+        std::mt19937 rng(4321u);
+        std::uniform_int_distribution<int> jitter(-12, 12);
+        std::vector<uint32_t> px(n * n);
+        for (int i = 0; i < n * n; i++)
+        {
+            const int v = jitter(rng);
+            const int k = rng() % 5;
+            px[i] = k == 0 ? Pixel(36 + v, 78 + v, 34 + v)          // shadowed leaves
+                  : k == 1 ? Pixel(88 + v, 150 + v, 66 + v)         // lit leaves
+                           : Pixel(56 + v, 112 + v, 46 + v);
+        }
+        return px;
+    }
+
+    // One triangle, wound so it faces along n (clockwise as seen from outside = front face).
+    void AddTri(std::vector<VERTEX_3D>& out, XMFLOAT3 a, XMFLOAT3 b, XMFLOAT3 c, XMFLOAT3 n, XMFLOAT4 color)
+    {
+        const XMVECTOR va = XMLoadFloat3(&a), vb = XMLoadFloat3(&b), vc = XMLoadFloat3(&c);
+        const float facing = XMVectorGetX(XMVector3Dot(XMVector3Cross(vb - va, vc - va), XMLoadFloat3(&n)));
+        if (facing < 0.0f)
+            std::swap(b, c);
+        VERTEX_3D v{};
+        v.Normal = n;
+        v.Diffuse = color;
+        v.Position = a; out.push_back(v);
+        v.Position = b; out.push_back(v);
+        v.Position = c; out.push_back(v);
+    }
+
+    // The town's layout (prototype values, with the rows flipped so the gate is at the far end)
+    const int kTownX0 = 5, kTownX1 = 30;    // open tiles x 5..30
+    const int kTownZ0 = 5, kTownZ1 = 22;    // open tiles z 5..22 (26 x 18)
+    const int kGateX = 17, kGateZ = 22;     // gate = the stairs, far (north) row
+    const int kTownStartX = 17, kTownStartZ = 9;
 }
 
 void TileMap::Init()
@@ -91,7 +189,7 @@ void TileMap::Init()
     Renderer::CreatePixelShader(&m_PixelShader, "shader\\pointLitPS.cso");
 
     m_WallTexture = LoadTexture(L"asset\\texture\\Brick.jpg");
-    m_FloorTexture = LoadTexture(L"asset\\texture\\block_field.png");
+    m_FloorTexture = LoadTexture(L"asset\\texture\\Ground.png");
 
     // Cube without a bottom face; each side has its own shade so edges read clearly.
     std::vector<VERTEX_3D>& cube = m_CubeVertices;
@@ -127,6 +225,19 @@ void TileMap::Init()
     };
     m_QuadVB = CreateVB(quadV, 4);
 
+    // Town (C8): grass floor repeating every 4 tiles, hedge walls, tree mesh
+    VERTEX_3D townV[4] =
+    {
+        MakeVertex(XMFLOAT3(0, 0, h), up, 1.0f, XMFLOAT2(0, 0)),
+        MakeVertex(XMFLOAT3(w, 0, h), up, 1.0f, XMFLOAT2(w / 4.0f, 0)),
+        MakeVertex(XMFLOAT3(0, 0, 0), up, 1.0f, XMFLOAT2(0, h / 4.0f)),
+        MakeVertex(XMFLOAT3(w, 0, 0), up, 1.0f, XMFLOAT2(w / 4.0f, h / 4.0f)),
+    };
+    m_TownFloorVB = CreateVB(townV, 4);
+    m_GrassTexture = CreateTextureRGBA(64, 64, MakeGrassPixels());
+    m_HedgeTexture = CreateTextureRGBA(32, 32, MakeHedgePixels());
+    BuildTreeMesh();
+
     m_Tiles.reserve(W * H);
     m_Dist.reserve(W * H);
     m_VisibleWalls.reserve(W * H);
@@ -134,7 +245,7 @@ void TileMap::Init()
     m_BlockHp.reserve(W * H);
     m_BlockDamage.reserve(W * H);
 
-    Generate(std::random_device{}(), 1);
+    Generate(std::random_device{}(), 0);    // every run starts in the town (C8)
 }
 
 void TileMap::Uninit()
@@ -151,6 +262,10 @@ void TileMap::Uninit()
     SafeRelease(m_FogTexture);
     SafeRelease(m_FogSRV);
     SafeRelease(m_FogSampler);
+    SafeRelease(m_TownFloorVB);
+    SafeRelease(m_TreeVB);
+    SafeRelease(m_GrassTexture);
+    SafeRelease(m_HedgeTexture);
 
     GameObject::Uninit();
 }
@@ -174,12 +289,22 @@ void TileMap::Update()
         Lighting::SetFogMap(W, H);
     }
 
-    // M7: every crystal glows and lights the floor around it; the stairs give a gold glow
-    for (int i = 0; i < W * H; i++)
-        if (m_Tiles[i] == Tile::Block && m_OreGrade[i] == 3)
-            Lighting::AddLight(i % W + 0.5f, 0.8f, i / W + 0.5f, 4.5f, 0x6fdcea,
-                               1.1f * Lighting::Flicker((float)i));
-    Lighting::AddLight(m_StairsX + 0.5f, 0.6f, m_StairsZ + 0.5f, 3.0f, 0xe0a83a, 0.8f);
+    if (IsTown())
+    {
+        // Town: the two torches beside the gate
+        for (int side = -1; side <= 1; side += 2)
+            Lighting::AddLight(m_StairsX + 0.5f + side * 0.85f, 1.4f, m_StairsZ + 0.3f, 4.0f, 0xff9a40,
+                               1.3f * Lighting::Flicker(side * 3.0f));
+    }
+    else
+    {
+        // M7: every crystal glows and lights the floor around it; the stairs give a gold glow
+        for (int i = 0; i < W * H; i++)
+            if (m_Tiles[i] == Tile::Block && m_OreGrade[i] == 3)
+                Lighting::AddLight(i % W + 0.5f, 0.8f, i / W + 0.5f, 4.5f, 0x6fdcea,
+                                   1.1f * Lighting::Flicker((float)i));
+        Lighting::AddLight(m_StairsX + 0.5f, 0.6f, m_StairsZ + 0.5f, 3.0f, 0xe0a83a, 0.8f);
+    }
 
     GameObject::Update();
 }
@@ -214,6 +339,15 @@ void TileMap::Generate(uint32_t seed, int floorNo)
 {
     m_Seed = seed;
     m_FloorNo = floorNo;
+    Lighting::ApplyFloorPreset(floorNo);    // town daylight or dungeon dark (C8)
+
+    if (floorNo <= 0)
+    {
+        m_FloorNo = 0;
+        GenerateTown(seed);
+        return;
+    }
+    m_Trees.clear();
 
     // Own generator per floor: the same seed + floor always gives the same layout.
     std::mt19937 rng(seed ^ (uint32_t)(floorNo * 0x9E3779B9u));
@@ -264,6 +398,35 @@ void TileMap::Generate(uint32_t seed, int floorNo)
     m_StartZ = start / W;
 
     // 4. Breadth-first search (4 directions) from the start.
+    const int farthest = ComputeDistances(start);
+
+    // 5. Seal floor the search never reached, so every floor tile is reachable.
+    for (int i = 0; i < W * H; i++)
+        if (m_Tiles[i] == Tile::Floor && m_Dist[i] < 0)
+            m_Tiles[i] = Tile::Wall;
+
+    // 6. Stairs on the last tile reached = the farthest walk from the start.
+    const int stairs = farthest;
+    m_Tiles[stairs] = Tile::Stairs;
+    m_StairsX = stairs % W;
+    m_StairsZ = stairs / W;
+    assert(m_Dist[stairs] >= 0);
+
+    FindVisibleWalls();
+    BuildWallMesh();
+    PlaceOre(seed, floorNo);
+
+    // New floor: nothing seen yet
+    m_Visible.assign(W * H, 0);
+    m_Seen.assign(W * H, 0);
+    m_ViewTile = -1;
+    m_FogDirty = true;
+}
+
+// Breadth-first search (4 directions) from the start tile: m_Dist = steps, -1 = unreachable.
+// Returns the last tile reached (the farthest walk from the start).
+int TileMap::ComputeDistances(int start)
+{
     m_Dist.assign(W * H, -1);
     std::vector<int> queue;
     queue.reserve(W * H);
@@ -286,20 +449,12 @@ void TileMap::Generate(uint32_t seed, int floorNo)
             }
         }
     }
+    return queue.back();
+}
 
-    // 5. Seal floor the search never reached, so every floor tile is reachable.
-    for (int i = 0; i < W * H; i++)
-        if (m_Tiles[i] == Tile::Floor && m_Dist[i] < 0)
-            m_Tiles[i] = Tile::Wall;
-
-    // 6. Stairs on the last tile reached = the farthest walk from the start.
-    const int stairs = queue.back();
-    m_Tiles[stairs] = Tile::Stairs;
-    m_StairsX = stairs % W;
-    m_StairsZ = stairs / W;
-    assert(m_Dist[stairs] >= 0);
-
-    // Only walls next to open space can ever be seen.
+// Only walls next to open space can ever be seen.
+void TileMap::FindVisibleWalls()
+{
     m_VisibleWalls.clear();
     for (int z = 0; z < H; z++)
         for (int x = 0; x < W; x++)
@@ -313,15 +468,87 @@ void TileMap::Generate(uint32_t seed, int floorNo)
             if (nearOpen)
                 m_VisibleWalls.push_back(z * W + x);
         }
+}
 
-    BuildWallMesh();
-    PlaceOre(seed, floorNo);
+// Floor 0 (C8): a safe 26x18 grass field fenced by hedges, trees around it, the dungeon
+// gate in the far row. No ore, no monsters; fully revealed (no fog of war).
+void TileMap::GenerateTown(uint32_t seed)
+{
+    m_Tiles.assign(W * H, Tile::Wall);
+    for (int z = kTownZ0; z <= kTownZ1; z++)
+        for (int x = kTownX0; x <= kTownX1; x++)
+            Set(x, z, Tile::Floor);
 
-    // New floor: nothing seen yet
-    m_Visible.assign(W * H, 0);
-    m_Seen.assign(W * H, 0);
+    m_StartX = kTownStartX;
+    m_StartZ = kTownStartZ;
+    m_StairsX = kGateX;
+    m_StairsZ = kGateZ;
+    Set(kGateX, kGateZ, Tile::Stairs);
+    ComputeDistances(m_StartZ * W + m_StartX);
+
+    FindVisibleWalls();
+    BuildWallMesh();                        // hedges (lower than cave walls)
+    PlaceOre(seed, 0);                      // clears the block arrays; places nothing on floor 0
+
+    // A ring of trees 2 tiles outside the field, every 3rd tile, slightly jittered
+    std::mt19937 rng(seed ^ 0x7EE5u);
+    std::uniform_real_distribution<float> scale(0.9f, 1.4f), jitter(-0.25f, 0.25f);
+    m_Trees.clear();
+    auto addTree = [&](int x, int z) { m_Trees.push_back({ x + 0.5f + jitter(rng), z + 0.5f + jitter(rng), scale(rng) }); };
+    for (int x = kTownX0 - 2; x <= kTownX1 + 2; x += 3)
+    {
+        addTree(x, kTownZ0 - 2);
+        addTree(x, kTownZ1 + 2);
+    }
+    for (int z = kTownZ0 + 1; z <= kTownZ1 - 1; z += 3)
+    {
+        addTree(kTownX0 - 2, z);
+        addTree(kTownX1 + 2, z);
+    }
+
+    // Fully revealed: everything counts as seen and visible
+    m_Visible.assign(W * H, 1);
+    m_Seen.assign(W * H, 1);
     m_ViewTile = -1;
     m_FogDirty = true;
+}
+
+// A low-poly tree: 8-sided trunk (0.8 high) and a 7-sided cone of leaves (1.5 high).
+void TileMap::BuildTreeMesh()
+{
+    std::vector<VERTEX_3D> v;
+    const XMFLOAT4 bark(0.45f, 0.30f, 0.18f, 1.0f);
+    const float pi2 = XM_2PI;
+
+    const int trunkSides = 8;
+    const float trunkR = 0.11f, trunkH = 0.8f;
+    for (int s = 0; s < trunkSides; s++)
+    {
+        const float a0 = pi2 * s / trunkSides, a1 = pi2 * (s + 1) / trunkSides, am = (a0 + a1) * 0.5f;
+        const XMFLOAT3 n(cosf(am), 0.0f, sinf(am));
+        const XMFLOAT3 b0(cosf(a0) * trunkR, 0.0f, sinf(a0) * trunkR), b1(cosf(a1) * trunkR, 0.0f, sinf(a1) * trunkR);
+        const XMFLOAT3 t0(b0.x, trunkH, b0.z), t1(b1.x, trunkH, b1.z);
+        AddTri(v, b0, t0, t1, n, bark);
+        AddTri(v, b0, t1, b1, n, bark);
+    }
+
+    const int leafSides = 7;
+    const float leafR = 0.62f, leafBase = 0.55f, leafTop = leafBase + 1.5f;
+    const float slope = leafR / (leafTop - leafBase);          // tilts the side normals upward
+    for (int s = 0; s < leafSides; s++)
+    {
+        const float a0 = pi2 * s / leafSides, a1 = pi2 * (s + 1) / leafSides, am = (a0 + a1) * 0.5f;
+        XMFLOAT3 n(cosf(am), slope, sinf(am));
+        XMStoreFloat3(&n, XMVector3Normalize(XMLoadFloat3(&n)));
+        const float shade = (s % 2) ? 0.9f : 1.0f;            // alternate faces read as facets
+        const XMFLOAT4 leaf(0.22f * shade, 0.52f * shade, 0.24f * shade, 1.0f);
+        const XMFLOAT3 b0(cosf(a0) * leafR, leafBase, sinf(a0) * leafR), b1(cosf(a1) * leafR, leafBase, sinf(a1) * leafR);
+        AddTri(v, b0, XMFLOAT3(0.0f, leafTop, 0.0f), b1, n, leaf);
+        AddTri(v, b0, b1, XMFLOAT3(0.0f, leafBase, 0.0f), XMFLOAT3(0.0f, -1.0f, 0.0f), XMFLOAT4(0.16f, 0.36f, 0.17f, 1.0f));
+    }
+
+    m_TreeVertexCount = (UINT)v.size();
+    m_TreeVB = CreateVB(v.data(), m_TreeVertexCount);
 }
 
 // Bake every visible wall into one vertex buffer. Walls never change during a floor,
@@ -334,7 +561,9 @@ void TileMap::BuildWallMesh()
     for (int index : m_VisibleWalls)
     {
         const int x = index % W, z = index / W;
-        const float height = 1.05f + ((x * 7 + z * 13) % 5) * 0.04f;   // slight height variation
+        const float height = IsTown()
+            ? 0.70f + ((x * 7 + z * 13) % 5) * 0.05f                    // hedges 0.7-0.9
+            : 1.05f + ((x * 7 + z * 13) % 5) * 0.04f;                   // slight height variation
 
         for (VERTEX_3D v : m_CubeVertices)
         {
@@ -363,6 +592,8 @@ void TileMap::PlaceOre(uint32_t seed, int floorNo)
     m_BlockDamage.assign(W * H, 0.0f);
     m_BlockShake.assign(W * H, 0.0f);
     m_BlocksLeft = 0;
+    if (floorNo <= 0)
+        return;                             // the town has no ore
 
     std::vector<int> open;
     open.reserve(W * H);
@@ -531,15 +762,17 @@ void TileMap::Draw()
     material.TextureEnable = TRUE;
     Renderer::SetMaterial(material);
 
-    // Floor
+    const bool town = IsTown();
+
+    // Floor (grass in the town)
     Renderer::SetWorldMatrix(XMMatrixIdentity());
-    ctx->PSSetShaderResources(0, 1, &m_FloorTexture);
-    ctx->IASetVertexBuffers(0, 1, &m_FloorVB, &stride, &offset);
+    ctx->PSSetShaderResources(0, 1, town ? &m_GrassTexture : &m_FloorTexture);
+    ctx->IASetVertexBuffers(0, 1, town ? &m_TownFloorVB : &m_FloorVB, &stride, &offset);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(4, 0);
 
-    // Walls: one draw call for the whole floor
-    ctx->PSSetShaderResources(0, 1, &m_WallTexture);
+    // Walls: one draw call for the whole floor (hedges in the town)
+    ctx->PSSetShaderResources(0, 1, town ? &m_HedgeTexture : &m_WallTexture);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     if (m_WallVB)
     {
@@ -575,6 +808,12 @@ void TileMap::Draw()
         ctx->Draw(m_CubeVertexCount, 0);
     }
 
+    if (town)
+    {
+        DrawTown(material);                 // the gate replaces the stairs marker
+        return;
+    }
+
     // Stairs marker: a flat gold square
     material.TextureEnable = FALSE;
     material.Diffuse = XMFLOAT4(0.88f, 0.66f, 0.23f, 1.0f);
@@ -585,6 +824,72 @@ void TileMap::Draw()
     ctx->IASetVertexBuffers(0, 1, &m_QuadVB, &stride, &offset);
     ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
     ctx->Draw(4, 0);
+}
+
+// Town (C8): the dungeon gate (two stone pillars, a lintel, a dark doorway, two torches)
+// and the ring of trees.
+void TileMap::DrawTown(MATERIAL& material)
+{
+    ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
+    UINT stride = sizeof(VERTEX_3D);
+    UINT offset = 0;
+    const float gx = m_StairsX + 0.5f, gz = m_StairsZ + 0.5f;
+
+    // Stone pillars and lintel: brick-textured cubes
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ctx->IASetVertexBuffers(0, 1, &m_CubeVB, &stride, &offset);
+    ctx->PSSetShaderResources(0, 1, &m_WallTexture);
+    material.TextureEnable = TRUE;
+    material.Diffuse = XMFLOAT4(0.70f, 0.68f, 0.66f, 1.0f);
+    material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    Renderer::SetMaterial(material);
+    for (int side = -1; side <= 1; side += 2)
+    {
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.32f, 1.7f, 0.32f) *
+            XMMatrixTranslation(gx + side * 0.55f, 0.85f, gz));
+        ctx->Draw(m_CubeVertexCount, 0);
+    }
+    Renderer::SetWorldMatrix(XMMatrixScaling(1.46f, 0.24f, 0.38f) * XMMatrixTranslation(gx, 1.82f, gz));
+    ctx->Draw(m_CubeVertexCount, 0);
+
+    // Torches: a thin stick and a small glowing flame beside each pillar
+    material.TextureEnable = FALSE;
+    for (int side = -1; side <= 1; side += 2)
+    {
+        const float tx = gx + side * 0.85f, tz = gz - 0.2f;
+        material.Diffuse = XMFLOAT4(0.40f, 0.26f, 0.14f, 1.0f);
+        material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+        Renderer::SetMaterial(material);
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.06f, 1.1f, 0.06f) * XMMatrixTranslation(tx, 0.55f, tz));
+        ctx->Draw(m_CubeVertexCount, 0);
+        const float flicker = Lighting::Flicker(side * 3.0f);
+        material.Diffuse = XMFLOAT4(1.0f, 0.6f, 0.25f, 1.0f);
+        material.Emission = XMFLOAT4(0.9f * flicker, 0.5f * flicker, 0.15f, 0.0f);
+        Renderer::SetMaterial(material);
+        Renderer::SetWorldMatrix(XMMatrixScaling(0.13f, 0.18f, 0.13f) * XMMatrixTranslation(tx, 1.18f, tz));
+        ctx->Draw(m_CubeVertexCount, 0);
+    }
+
+    // Doorway: a dark upright quad between the pillars, facing the camera
+    material.Diffuse = XMFLOAT4(0.03f, 0.02f, 0.02f, 1.0f);
+    material.Emission = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+    Renderer::SetMaterial(material);
+    Renderer::SetWorldMatrix(XMMatrixScaling(0.78f, 1.0f, 1.7f) * XMMatrixRotationX(-XM_PIDIV2) *
+        XMMatrixTranslation(gx, 0.85f, gz + 0.1f));
+    ctx->IASetVertexBuffers(0, 1, &m_QuadVB, &stride, &offset);
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ctx->Draw(4, 0);
+
+    // Trees: colours are in the vertices
+    material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+    Renderer::SetMaterial(material);
+    ctx->IASetVertexBuffers(0, 1, &m_TreeVB, &stride, &offset);
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    for (const TreeInstance& t : m_Trees)
+    {
+        Renderer::SetWorldMatrix(XMMatrixScaling(t.scale, t.scale, t.scale) * XMMatrixTranslation(t.x, 0.0f, t.z));
+        ctx->Draw(m_TreeVertexCount, 0);
+    }
 }
 
 // Shadow pass (M8): walls and ore blocks, depth only (no pixel shader).
@@ -615,6 +920,26 @@ void TileMap::DrawShadow()
         Renderer::SetWorldMatrix(XMMatrixScaling(size, size, size) *
             XMMatrixTranslation(i % W + 0.5f + WobbleOffset(i), size * 0.5f, i / W + 0.5f));
         ctx->Draw(m_CubeVertexCount, 0);
+    }
+
+    if (IsTown())
+    {
+        // The gate and the trees cast sun shadows too
+        const float gx = m_StairsX + 0.5f, gz = m_StairsZ + 0.5f;
+        for (int side = -1; side <= 1; side += 2)
+        {
+            Renderer::SetWorldMatrix(XMMatrixScaling(0.32f, 1.7f, 0.32f) * XMMatrixTranslation(gx + side * 0.55f, 0.85f, gz));
+            ctx->Draw(m_CubeVertexCount, 0);
+        }
+        Renderer::SetWorldMatrix(XMMatrixScaling(1.46f, 0.24f, 0.38f) * XMMatrixTranslation(gx, 1.82f, gz));
+        ctx->Draw(m_CubeVertexCount, 0);
+
+        ctx->IASetVertexBuffers(0, 1, &m_TreeVB, &stride, &offset);
+        for (const TreeInstance& t : m_Trees)
+        {
+            Renderer::SetWorldMatrix(XMMatrixScaling(t.scale, t.scale, t.scale) * XMMatrixTranslation(t.x, 0.0f, t.z));
+            ctx->Draw(m_TreeVertexCount, 0);
+        }
     }
 }
 
@@ -671,8 +996,8 @@ void TileMap::UpdateVisibility(float x, float z, float radius)
 
 bool TileMap::IsVisible(int x, int z) const
 {
-    if (!Lighting::GetSettings().fogOfWar)
-        return true;
+    if (!Lighting::GetSettings().fogOfWar || IsTown())
+        return true;                        // the town is always fully visible
     if (x < 0 || z < 0 || x >= W || z >= H || m_Visible.empty())
         return false;
     return m_Visible[z * W + x] != 0;

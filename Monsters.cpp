@@ -200,6 +200,9 @@ void Monsters::PopulateFloor(const TileMap& map)
     m_FlowTile = -1;
     m_SpawnTimer = (float)std::max(7, 17 - m_FloorNo);
 
+    if (map.IsTown())
+        return;                     // floor 0 is safe: no monsters, no potions (C8)
+
     // Free floor tiles more than 9 steps from the start
     std::vector<int> spots;
     spots.reserve(TileMap::W * TileMap::H);
@@ -389,7 +392,7 @@ void Monsters::Update()
 
     // New monsters trickle in out of sight
     m_SpawnTimer -= dt;
-    if (m_SpawnTimer <= 0.0f)
+    if (m_SpawnTimer <= 0.0f && !map->IsTown())
     {
         m_SpawnTimer = (float)std::max(7, 17 - m_FloorNo);
         if ((int)m_List.size() < 10 + 3 * m_FloorNo)

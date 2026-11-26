@@ -12,7 +12,7 @@
 void Title::Init()
 {
 
-	Manager::AddGameObj<Polygon2D>()->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\bill_board\\tora.png");
+	Manager::AddGameObj<Polygon2D>()->Init(0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT, L"asset\\texture\\title.png");
 }
 
 

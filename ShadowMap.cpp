@@ -213,8 +213,14 @@ namespace ShadowMap
         ctx->RSSetViewports(1, &vp);
         ctx->RSSetState(g_Raster);
 
-        // Moon camera: orthographic box around the player, looking along the light direction
-        XMVECTOR dir = XMVector3Normalize(XMVectorSet(g_Settings.moonDir[0], g_Settings.moonDir[1], g_Settings.moonDir[2], 0.0f));
+        // Moon camera: orthographic box around the player, looking along the light direction.
+        // In the town (floor 0) the same light is the sun.
+        const bool sun = Lighting::IsTown();
+        const float* lightDir = sun ? g_Settings.sunDir : g_Settings.moonDir;
+        const float* lightColor = sun ? g_Settings.sunColor : g_Settings.moonColor;
+        const float lightIntensity = sun ? g_Settings.sunIntensity : g_Settings.moonIntensity;
+        const float shadowedAmbient = sun ? g_Settings.sunShadowedAmbient : g_Settings.shadowedAmbient;
+        XMVECTOR dir = XMVector3Normalize(XMVectorSet(lightDir[0], lightDir[1], lightDir[2], 0.0f));
         XMVECTOR center = XMVectorSet(focusX, 0.0f, focusZ, 1.0f);
         XMVECTOR eye = XMVectorSubtract(center, XMVectorScale(dir, 40.0f));
         XMMATRIX view = XMMatrixLookAtLH(eye, center, XMVectorSet(0.0f, 0.0f, 1.0f, 0.0f));
@@ -235,9 +241,9 @@ namespace ShadowMap
         XMStoreFloat4x4(&cb.lightViewProj, XMMatrixTranspose(view * proj));
         XMFLOAT3 d;
         XMStoreFloat3(&d, dir);
-        cb.moonDirIntensity = XMFLOAT4(d.x, d.y, d.z, g_Settings.moonIntensity);
-        cb.moonColor = XMFLOAT4(g_Settings.moonColor[0], g_Settings.moonColor[1], g_Settings.moonColor[2], g_Settings.shadowedAmbient);
-        cb.params = XMFLOAT4(1.0f / kSize, g_Settings.bias, g_Settings.pcf ? 1.0f : 0.0f, g_Settings.enabled ? 1.0f : 0.0f);
+        cb.moonDirIntensity = XMFLOAT4(d.x, d.y, d.z, lightIntensity);
+        cb.moonColor = XMFLOAT4(lightColor[0], lightColor[1], lightColor[2], shadowedAmbient);
+        cb.params = XMFLOAT4(1.0f / kSize, g_Settings.bias, g_Settings.pcf ? 1.0f : 0.0f, MoonShadowsActive() ? 1.0f : 0.0f);
         cb.lampPosFar = XMFLOAT4(g_Lamp[0], g_Lamp[1], g_Lamp[2], g_Lamp[3]);
         cb.lampParams = XMFLOAT4(g_LampActive ? 1.0f : 0.0f, g_Settings.lampBias, 2.0f / g_LampSize, kLampNear);
         ctx->UpdateSubresource(g_Buffer, 0, nullptr, &cb, 0, 0);
@@ -245,6 +251,8 @@ namespace ShadowMap
 
     bool MoonShadowsActive()
     {
+        if (Lighting::IsTown())
+            return g_Settings.sunIntensity > 0.0f;      // the sun always casts shadows in the town
         return g_Settings.enabled && g_Settings.moonIntensity > 0.0f;
     }
 

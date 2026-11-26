@@ -69,7 +69,21 @@ private:
     ID3D11ShaderResourceView* m_WallTexture = nullptr;
     ID3D11ShaderResourceView* m_FloorTexture = nullptr;
 
+    // Floor 0, the town (C8): grass and hedge textures made in code, trees, the dungeon gate
+    struct TreeInstance { float x, z, scale; };
+    std::vector<TreeInstance> m_Trees;
+    ID3D11ShaderResourceView* m_GrassTexture = nullptr;
+    ID3D11ShaderResourceView* m_HedgeTexture = nullptr;
+    ID3D11Buffer* m_TownFloorVB = nullptr;      // grass repeats every 4 tiles instead of every tile
+    ID3D11Buffer* m_TreeVB = nullptr;           // trunk + cone leaves, colours in the vertices
+    UINT m_TreeVertexCount = 0;
+
     void Set(int x, int z, Tile t);
+    int  ComputeDistances(int start);   // breadth-first steps into m_Dist; returns the farthest tile
+    void FindVisibleWalls();
+    void GenerateTown(uint32_t seed);
+    void BuildTreeMesh();
+    void DrawTown(MATERIAL& material);  // gate and trees
     bool BoxHits(float x, float z, float half) const;
     void PlaceOre(uint32_t seed, int floorNo);
     void BuildWallMesh();
@@ -101,6 +115,8 @@ public:
     MineResult MineBlock(int x, int z, float power, int mineLevel);
 
     Vector3 GetStartPosition() const { return Vector3(m_StartX + 0.5f, 0.0f, m_StartZ + 0.5f); }
+    Vector3 GetStairsPosition() const { return Vector3(m_StairsX + 0.5f, 0.0f, m_StairsZ + 0.5f); }
+    bool IsTown() const { return m_FloorNo == 0; }  // floor 0: the green field with the dungeon gate
     uint32_t GetSeed() const { return m_Seed; }
     int GetFloor() const { return m_FloorNo; }
     int GetDrawnWalls() const { return m_DrawnWalls; }

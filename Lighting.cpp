@@ -55,6 +55,9 @@ namespace
     Light g_Lamp{};
     bool  g_HasLamp = false;
 
+    bool  g_Town = false;                   // floor 0: daylight preset (C8)
+    float g_DungeonClear[3] = { 0.04f, 0.03f, 0.03f };   // clear colour to restore when leaving town
+
     float g_FocusX = 0.0f, g_FocusZ = 0.0f;
     float g_Time = 0.0f;
 
@@ -209,17 +212,45 @@ namespace Lighting
             cb.posRadius[i] = XMFLOAT4(l.x, l.y, l.z, l.radius);
             cb.color[i] = XMFLOAT4(l.r, l.g, l.b, 1.0f);
         }
-        const float* clear = Renderer::GetClearColor();
-        cb.ambientCount = XMFLOAT4(g_Settings.ambient[0], g_Settings.ambient[1], g_Settings.ambient[2], (float)g_Used);
-        cb.fogColorStart = XMFLOAT4(clear[0], clear[1], clear[2], g_Settings.fog ? g_Settings.fogStart : 1000.0f);
-        cb.fogEndEnabled = XMFLOAT4(g_Settings.fog ? g_Settings.fogEnd : 2000.0f, g_Settings.enabled ? 1.0f : 0.0f, 0.0f, 0.0f);
-        const bool fogOfWar = g_Settings.fogOfWar && g_FogMapW > 0 && g_FogMapH > 0;
+        float* clear = Renderer::GetClearColor();
+        const float* ambient = g_Settings.ambient;
+        float fogStart = g_Settings.fogStart, fogEnd = g_Settings.fogEnd;
+        if (g_Town)
+        {
+            ambient = g_Settings.townAmbient;
+            fogStart = g_Settings.townFogStart;
+            fogEnd = g_Settings.townFogEnd;
+            for (int i = 0; i < 3; i++)
+                clear[i] = g_Settings.townFogColor[i];      // sky = fog colour (live from the F1 panel)
+        }
+        cb.ambientCount = XMFLOAT4(ambient[0], ambient[1], ambient[2], (float)g_Used);
+        cb.fogColorStart = XMFLOAT4(clear[0], clear[1], clear[2], g_Settings.fog ? fogStart : 1000.0f);
+        cb.fogEndEnabled = XMFLOAT4(g_Settings.fog ? fogEnd : 2000.0f, g_Settings.enabled ? 1.0f : 0.0f, 0.0f, 0.0f);
+        // The town is fully revealed: no fog of war on floor 0
+        const bool fogOfWar = g_Settings.fogOfWar && !g_Town && g_FogMapW > 0 && g_FogMapH > 0;
         cb.fogOfWar = XMFLOAT4(fogOfWar ? 1.0f : 0.0f, fogOfWar ? 1.0f / g_FogMapW : 0.0f,
                                fogOfWar ? 1.0f / g_FogMapH : 0.0f, 0.0f);
 
         if (g_Buffer)
             Renderer::GetDeviceContext()->UpdateSubresource(g_Buffer, 0, nullptr, &cb, 0, 0);
     }
+
+    void ApplyFloorPreset(int floor)
+    {
+        const bool town = floor <= 0;
+        if (town == g_Town)
+            return;
+        float* clear = Renderer::GetClearColor();
+        if (town)
+            for (int i = 0; i < 3; i++)
+                g_DungeonClear[i] = clear[i];               // remember the cave colour (F1 may have changed it)
+        else
+            for (int i = 0; i < 3; i++)
+                clear[i] = g_DungeonClear[i];
+        g_Town = town;
+    }
+
+    bool IsTown() { return g_Town; }
 
     Settings& GetSettings() { return g_Settings; }
     float FocusX() { return g_FocusX; }

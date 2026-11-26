@@ -16,6 +16,7 @@
 #include "Juice.h"
 #include "GameState.h"
 #include "SaveData.h"
+#include "Lighting.h"
 
 void Game::Init()
 {
@@ -35,7 +36,10 @@ void Game::Init()
     Manager::AddGameObj<Fade>()->Init(false, nullptr);
 }
 
-void Game::Uninit() {}
+void Game::Uninit()
+{
+    Lighting::ApplyFloorPreset(1);      // leaving the game from the town: back to the dark clear colour
+}
 
 void Game::Update()
 {

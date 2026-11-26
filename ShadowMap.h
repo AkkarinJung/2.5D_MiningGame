@@ -27,6 +27,13 @@ namespace ShadowMap
         bool  lampShadows = true;
         int   lampFaceSize = 512;           // 256 / 512 / 1024 per face
         float lampBias = 0.03f;             // fraction of the distance (raise if you see acne)
+
+        // Floor 0 sun (C8): the same light and map as the moon, with daylight values.
+        // Always casts shadows in the town, whatever "enabled" says.
+        float sunDir[3] = { 10.0f, -24.0f, 12.0f };     // from the front-left, high up
+        float sunColor[3] = { 1.0f, 0.94f, 0.82f };     // #fff0d0
+        float sunIntensity = 1.25f;
+        float sunShadowedAmbient = 0.55f;
     };
 
     void Init();                            // after Renderer::Init

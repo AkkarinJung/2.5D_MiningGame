@@ -151,3 +151,10 @@ Floor %d. The air feels more hostile.	B%dF に到着。敵の気配が濃くな�
 +%d XP	+%d 経験値
 Mining Lv%d!	採掘Lv%d!
 Too hard! Lv%d	かたい! Lv%d
+Town	町
+Dungeon	ダンジョン
+Dungeon entrance	ダンジョンの入口
+Ready? Monsters wait inside.	準備はいい？中ではモンスターが待っている。
+Stay in town  [1]	町に残る  [1]
+Enter  [2]	入る  [2]
+You step into the dungeon.	ダンジョンに足を踏み入れた。

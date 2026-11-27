@@ -10,6 +10,7 @@
 #include "GameObject.h"
 #include "Monsters.h"
 #include "Projectiles.h"
+#include "Pickups.h"
 #include "Cards.h"
 #include "Prompts.h"
 #include "Hud.h"
@@ -27,6 +28,7 @@ void Game::Init()
 
     Manager::AddGameObj<Monsters>();
     Manager::AddGameObj<Projectiles>();
+    Manager::AddGameObj<Pickups>();    // C1: loot on the floor, pulled into the bag
     Manager::AddGameObj<Juice>();      // debris, damage numbers, hit-stop, shake
     Manager::AddGameObj<Cards>();      // after Player, so a level-up opens its pick the same frame
     Manager::AddGameObj<Prompts>();    // stairs, restart (R) and death screen

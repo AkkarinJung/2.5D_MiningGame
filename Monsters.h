@@ -2,7 +2,7 @@
 // Monsters: every monster on the floor as plain structs in one vector.
 // Sleep until they see the player, then chase along a shared distance map
 // (breadth-first search from the player's tile) so they find their way around walls.
-// Also owns the potions lying on the floor, since they share the sprite renderer.
+// Floor potions and potion drops live in Pickups (C1).
 
 #include "GameObject.h"
 #include "renderer.h"
@@ -33,16 +33,10 @@ struct Monster
     float poisonTick = 0.0f;
 };
 
-struct Potion
-{
-    float x = 0.0f, z = 0.0f;
-};
-
 class Monsters : public GameObject
 {
 private:
     std::vector<Monster> m_List;
-    std::vector<Potion>  m_Potions;
     std::vector<int> m_Flow;            // steps to the player's tile (-1 = unreachable)
     std::mt19937 m_Rng;
 
@@ -55,7 +49,7 @@ private:
     bool  m_Frozen = false;
     int   m_NextHitId = 0;
 
-    static const int kSpriteCount = kMonsterTypeCount + 1;     // monsters + potion
+    static const int kSpriteCount = kMonsterTypeCount;         // one sprite per monster type
 
     ID3D11Buffer* m_QuadVB[kSpriteCount] = {};
     ID3D11InputLayout* m_VertexLayout = nullptr;
@@ -103,12 +97,9 @@ public:
     // Nearest visible monster within reach; writes its direction to angle.
     bool FindTarget(float x, float z, float reach, float& angle) const;
 
-    void DropPotion(float x, float z) { m_Potions.push_back({ x, z }); }
-
     void KillAll();
     int Count() const { return (int)m_List.size(); }
     int AwakeCount() const;
-    int PotionsOnFloor() const { return (int)m_Potions.size(); }
     bool& Frozen() { return m_Frozen; }
 };
 

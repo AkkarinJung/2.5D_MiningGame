@@ -4,6 +4,7 @@
 #include "animationModel.h"
 #include "ClassData.h"
 #include "CardData.h"
+#include "Inventory.h"
 
 class Player : public GameObject
 {
@@ -58,7 +59,7 @@ private:
     float m_Attack = 3.0f;
     float m_Invincible = 0.0f;
     bool  m_GodMode = false;
-    int   m_Potions = 1;        // start with 1
+    Inventory m_Bag;            // C1: materials, potions, bombs, torches (starts with 1 potion)
     float m_LampBonus = 0.0f;   // Bright Lamp card: extra lamp radius
     bool  m_LastCrit = false;   // the last RollDamage was a crit (for yellow damage numbers)
 
@@ -134,9 +135,17 @@ public:
     int  GetMaxHp() const { return m_MaxHp; }
     bool IsDead() const { return m_Hp <= 0; }
     bool& GodMode() { return m_GodMode; }
-    void AddPotion() { m_Potions++; }
-    int  GetPotions() const { return m_Potions; }
+    void AddPotion() { AddToBagOrDrop(MatId::Potion, 1); }
+    int  GetPotions() const { return m_Bag.Count(MatId::Potion); }
     void DrinkPotion();
+
+    // C1: the bag
+    Inventory& GetBag() { return m_Bag; }
+    const Inventory& GetBag() const { return m_Bag; }
+    // Put n in the bag; whatever does not fit drops at the player's feet.
+    void AddToBagOrDrop(MatId id, int n);
+    // Empty bag slot i onto the floor (not picked up again until the player steps away).
+    void DropBagSlot(int slot);
 
     PlayerClass GetClass() const { return m_Class; }
     bool LastAttackWasCrit() const { return m_LastCrit; }

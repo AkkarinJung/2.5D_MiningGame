@@ -13,6 +13,7 @@
 
 #include "Monsters.h"
 #include "Projectiles.h"
+#include "Pickups.h"
 #include "Cards.h"
 #include "GameState.h"
 #include "Text.h"
@@ -43,6 +44,9 @@ void Player::Init()
     m_InvincibleTime = cls.invincibility;
     m_Crit = cls.crit;
     m_MiningXpScale = cls.miningXpScale;
+
+    m_Bag.Clear();
+    m_Bag.Add(MatId::Potion, 1);        // every run starts with one potion
 
     m_Layer = 1;
     m_Position = { 0.0f, 0.0f, 0.0f };
@@ -638,7 +642,7 @@ void Player::ApplyCard(CardId id)
     case CardId::FleetFoot:   m_Speed *= 1.12f; break;
     case CardId::QuickHands:  m_AttackSpeed += 0.15f; break;
     case CardId::BrightLamp:  m_LampBonus += 1.8f; break;     // the prototype's +1.8 lamp reach per copy
-    case CardId::PotionPouch: m_Potions += 2; break;
+    case CardId::PotionPouch: AddToBagOrDrop(MatId::Potion, 2); break;     // overflow drops at your feet
     case CardId::SecondWind:  m_Hp = m_MaxHp; break;
     case CardId::IronSkin:    m_Armor += 1; break;
     case CardId::Leech:       m_Leech += 2; break;
@@ -670,12 +674,34 @@ void Player::ApplyCard(CardId id)
 // Q: drink a potion, healing 40% of max HP (rounded up, never above max).
 void Player::DrinkPotion()
 {
-    if (IsDead() || m_Potions <= 0 || m_Hp >= m_MaxHp)
+    if (IsDead() || GetPotions() <= 0 || m_Hp >= m_MaxHp)
         return;
 
     const int heal = std::min(m_MaxHp - m_Hp, (int)ceilf(m_MaxHp * 0.4f));
     m_Hp += heal;
-    m_Potions--;
-    DebugUI::Log("You drink a potion. +%d HP (%d left)", heal, m_Potions);
+    m_Bag.Take(MatId::Potion, 1);
+    DebugUI::Log("You drink a potion. +%d HP (%d left)", heal, GetPotions());
     Juice::Heal(m_Position.x, m_Position.z, heal);
+}
+
+// C1: whatever does not fit in the bag lands at the player's feet.
+void Player::AddToBagOrDrop(MatId id, int n)
+{
+    const int left = n - m_Bag.Add(id, n);
+    if (left <= 0)
+        return;
+    Pickups* pickups = Manager::GetGameObj<Pickups>();
+    if (pickups)
+        pickups->DropFromPlayer(id, left, m_Position.x, m_Position.z);
+}
+
+void Player::DropBagSlot(int slot)
+{
+    MatId id;
+    int n = 0;
+    if (!m_Bag.RemoveSlot(slot, id, n))
+        return;
+    Pickups* pickups = Manager::GetGameObj<Pickups>();
+    if (pickups)
+        pickups->DropFromPlayer(id, n, m_Position.x, m_Position.z);
 }

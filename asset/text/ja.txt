@@ -158,3 +158,14 @@ Ready? Monsters wait inside.	準備はいい？中ではモンスターが待っ
 Stay in town  [1]	町に残る  [1]
 Enter  [2]	入る  [2]
 You step into the dungeon.	ダンジョンに足を踏み入れた。
+Bag full	カバンがいっぱい
+Stone	石
+Copper	銅
+Silver	銀
+Gold	金
+Gel	ジェル
+Fang	牙
+Stone Core	岩のコア
+Potion	回復薬
+Bomb	爆弾
+Torch	たいまつ

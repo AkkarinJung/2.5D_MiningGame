@@ -40,6 +40,7 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="input.cpp" />
+    <ClCompile Include="Inventory.cpp" />
     <ClCompile Include="Juice.cpp" />
     <ClCompile Include="Lighting.cpp" />
     <ClCompile Include="main.cpp" />
@@ -47,6 +48,7 @@
     <ClCompile Include="modelRenderer.cpp" />
     <ClCompile Include="Monsters.cpp" />
     <ClCompile Include="Particle.cpp" />
+    <ClCompile Include="Pickups.cpp" />
     <ClCompile Include="Player.cpp" />
     <ClCompile Include="Polygon2D.cpp" />
     <ClCompile Include="Projectiles.cpp" />
@@ -92,6 +94,7 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="input.h" />
+    <ClInclude Include="Inventory.h" />
     <ClInclude Include="Juice.h" />
     <ClInclude Include="Lighting.h" />
     <ClInclude Include="main.h" />
@@ -102,6 +105,7 @@
     <ClInclude Include="MonsterData.h" />
     <ClInclude Include="OreData.h" />
     <ClInclude Include="Particle.h" />
+    <ClInclude Include="Pickups.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Polygon2D.h" />
     <ClInclude Include="Projectiles.h" />

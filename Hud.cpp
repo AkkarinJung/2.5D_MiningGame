@@ -72,6 +72,40 @@ void Hud::Update()
     ImGui::SameLine();
     ImGui::Text(Tr("Potion x%d"), player->GetPotions());
 
+    // Bag strip (C1): one box per slot, material colour + count
+    {
+        const Inventory& bag = player->GetBag();
+        const float box = 26.0f, gap = 4.0f;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImGui::PushFont(NULL, 13.0f);
+        for (int i = 0; i < bag.SlotCount(); i++)
+        {
+            if (i > 0)
+            {
+                ImGui::SameLine(0.0f, gap);
+                if (ImGui::GetContentRegionAvail().x < box)
+                    ImGui::NewLine();
+            }
+            const ImVec2 p0 = ImGui::GetCursorScreenPos();
+            const ImVec2 p1(p0.x + box, p0.y + box);
+            ImGui::Dummy(ImVec2(box, box));
+            const Inventory::Slot& s = bag.GetSlot(i);
+            draw->AddRectFilled(p0, p1, IM_COL32(20, 16, 14, 200), 3.0f);
+            if (s.used)
+            {
+                const uint32_t c = kMat[(int)s.id].color;
+                draw->AddRectFilled(ImVec2(p0.x + 4, p0.y + 4), ImVec2(p1.x - 4, p1.y - 9),
+                    IM_COL32((c >> 16) & 0xFF, (c >> 8) & 0xFF, c & 0xFF, 255), 2.0f);
+                char n[8];
+                snprintf(n, sizeof(n), "%d", s.n);
+                const ImVec2 ts = ImGui::CalcTextSize(n);
+                draw->AddText(ImVec2(p1.x - ts.x - 2, p1.y - ts.y), IM_COL32(240, 232, 220, 255), n);
+            }
+            draw->AddRect(p0, p1, IM_COL32(110, 96, 80, 200), 3.0f);
+        }
+        ImGui::PopFont();
+    }
+
     // Row 2: floor, mining level + XP, stats
     if (map->IsTown())
         ImGui::TextUnformatted(Tr("Town"));

@@ -1,6 +1,6 @@
 // Monsters.cpp
 // Monster AI (wake/sleep, distance-map steering, slime hops, bat zigzag, goblin chase,brute wind-up and charge), contact damage, melee hits from the player, spawning,
-// potions (floor loot, drops, pickup), and drawing everything as camera-facing
+// potion drops (handed to Pickups), and drawing everything as camera-facing
 // pixel-art billboards built from MonsterData.h, with HP bars over hurt monsters.
 
 #include "main.h"
@@ -14,6 +14,7 @@
 #include "Text.h"
 #include "Juice.h"
 #include "DebugUI.h"
+#include "Pickups.h"
 #include <cmath>
 #include <algorithm>
 #include <climits>
@@ -28,7 +29,7 @@ namespace
 
     const SpriteDef& SpriteFor(int k)
     {
-        return k < kMonsterTypeCount ? kMonster[k].sprite : kPotionSprite;
+        return kMonster[k].sprite;
     }
 
     float AngleDiff(float a, float b)
@@ -75,7 +76,7 @@ void Monsters::Init()
     Renderer::CreatePixelShader(&m_LitPS, "shader\\pointLitPS.cso");
     Renderer::CreatePixelShader(&m_ShadowPS, "shader\\shadowAlphaPS.cso");          // shadow pass (M8)
 
-    // Sprite atlas: every 8x8 sprite (monsters, then the potion) side by side in one texture.
+    // Sprite atlas: every 8x8 monster sprite side by side in one texture.
     const int atlasW = 8 * kSpriteCount, atlasH = 8;
     std::vector<uint32_t> pixels(atlasW * atlasH, 0);
     for (int k = 0; k < kSpriteCount; k++)
@@ -196,8 +197,10 @@ void Monsters::PopulateFloor(const TileMap& map)
     m_Seed = map.GetSeed();
     m_FloorNo = map.GetFloor();
     m_List.clear();
-    m_Potions.clear();
     m_FlowTile = -1;
+    Pickups* pickups = Manager::GetGameObj<Pickups>();
+    if (pickups)
+        pickups->Clear();           // last floor's loot stays behind (C1)
     m_SpawnTimer = (float)std::max(7, 17 - m_FloorNo);
 
     if (map.IsTown())
@@ -229,7 +232,8 @@ void Monsters::PopulateFloor(const TileMap& map)
         const int i = spots[pick];
         spots[pick] = spots.back();
         spots.pop_back();
-        DropPotion(i % TileMap::W + 0.5f, i / TileMap::W + 0.5f);
+        if (pickups)
+            pickups->Place(MatId::Potion, 1, i % TileMap::W + 0.5f, i / TileMap::W + 0.5f);
     }
 }
 
@@ -374,21 +378,6 @@ void Monsters::Update()
             Damage(m, (float)player->GetThorns(), p.x, p.z, 3.0f, false);
     }
     RemoveDead();
-
-    // Potion pickup
-    for (size_t i = 0; i < m_Potions.size();)
-    {
-        const float dx = p.x - m_Potions[i].x, dz = p.z - m_Potions[i].z;
-        if (dx * dx + dz * dz < 0.6f * 0.6f && !player->IsDead())
-        {
-            player->AddPotion();
-            DebugUI::Log("Picked up a red potion. (%d)", player->GetPotions());
-            m_Potions[i] = m_Potions.back();
-            m_Potions.pop_back();
-        }
-        else
-            i++;
-    }
 
     // New monsters trickle in out of sight
     m_SpawnTimer -= dt;
@@ -597,8 +586,9 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
     Juice::MonsterKilled(m.x, m.z);
     if (player)
         player->OnKill();               // Leech
-    if (std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.12f)
-        DropPotion(m.x, m.z);           // 12% potion drop
+    Pickups* pickups = Manager::GetGameObj<Pickups>();
+    if (pickups && std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.06f)
+        pickups->Spawn(MatId::Potion, 1, m.x, m.z);     // 6% potion drop (C1), pops out and bounces
     return true;
 }
 
@@ -728,11 +718,11 @@ int Monsters::AwakeCount() const
 void Monsters::Draw()
 {
     Camera* camera = Manager::GetGameObj<Camera>();
-    if (!camera || (m_List.empty() && m_Potions.empty()))
+    if (!camera || m_List.empty())
         return;
 
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
-    ctx->IASetInputLayout(m_LitLayout);         // sprites and potions are lit (M7)
+    ctx->IASetInputLayout(m_LitLayout);         // sprites are lit (M7)
     ctx->VSSetShader(m_LitVS, NULL, 0);
     ctx->PSSetShader(m_LitPS, NULL, 0);
     ctx->PSSetShaderResources(0, 1, &m_Atlas);
@@ -791,18 +781,6 @@ void Monsters::Draw()
         ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
         ctx->Draw(4, 0);
     }
-    // Potions bob gently on the floor
-    material.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-    material.Emission = XMFLOAT4(0.15f, 0.04f, 0.04f, 1.0f);   // potions glow faintly so they can be found
-    Renderer::SetMaterial(material);
-    ctx->IASetVertexBuffers(0, 1, &m_QuadVB[kMonsterTypeCount], &stride, &offset);
-    for (const Potion& potion : m_Potions)
-    {
-        const float y = 0.05f + sinf(m_Time * 4.5f + potion.x) * 0.05f;
-        Renderer::SetWorldMatrix(XMMatrixScaling(0.55f, 0.55f, 1.0f) *
-            invView * XMMatrixTranslation(potion.x, y, potion.z));
-        ctx->Draw(4, 0);
-    }
     // HP bars over hurt monsters: dark background, red fill nudged toward the camera.
     // Unlit, so they stay readable in the dark.
     ctx->IASetInputLayout(m_VertexLayout);
@@ -842,12 +820,12 @@ void Monsters::Draw()
         oldSampler->Release();          // PSGetSamplers added a reference
 }
 
-// Shadow pass (M8): monsters and potions as alpha-tested quads, so their silhouettes
+// Shadow pass (M8): monsters as alpha-tested quads, so their silhouettes
 // cast shadows. They face the camera (last frame's view), exactly as they are drawn.
 void Monsters::DrawShadow()
 {
     Camera* camera = Manager::GetGameObj<Camera>();
-    if (!camera || (m_List.empty() && m_Potions.empty()))
+    if (!camera || m_List.empty())
         return;
 
     ID3D11DeviceContext* ctx = Renderer::GetDeviceContext();
@@ -876,13 +854,6 @@ void Monsters::DrawShadow()
         Renderer::SetWorldMatrix(XMMatrixScaling(def.height, def.height, 1.0f) *
             invView * XMMatrixTranslation(m.x, y, m.z));
         ctx->IASetVertexBuffers(0, 1, &m_QuadVB[(int)m.type], &stride, &offset);
-        ctx->Draw(4, 0);
-    }
-    ctx->IASetVertexBuffers(0, 1, &m_QuadVB[kMonsterTypeCount], &stride, &offset);
-    for (const Potion& potion : m_Potions)
-    {
-        Renderer::SetWorldMatrix(XMMatrixScaling(0.55f, 0.55f, 1.0f) *
-            invView * XMMatrixTranslation(potion.x, 0.05f, potion.z));
         ctx->Draw(4, 0);
     }
 

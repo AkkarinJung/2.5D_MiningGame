@@ -17,6 +17,7 @@
 #include "Lighting.h"
 #include "ShadowMap.h"
 #include "Juice.h"
+#include "Pickups.h"
 #include <shellapi.h>
 
 #include "imgui/imgui.h"
@@ -284,8 +285,10 @@ void DebugUI::Draw()
             Monsters* monsters = Manager::GetGameObj<Monsters>();
             if (monsters && ImGui::CollapsingHeader("Monsters", ImGuiTreeNodeFlags_DefaultOpen))
             {
+                Pickups* loot = Manager::GetGameObj<Pickups>();
+
                 ImGui::Text("Count %d    awake %d    potions on floor %d",
-                    monsters->Count(), monsters->AwakeCount(), monsters->PotionsOnFloor());
+                    monsters->Count(), monsters->AwakeCount(), loot ? loot->CountOf(MatId::Potion) : 0);
                 ImGui::Checkbox("Freeze AI", &monsters->Frozen());
 
                 for (int t = 0; t < kMonsterTypeCount; t++)

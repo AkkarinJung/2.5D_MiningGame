@@ -187,6 +187,35 @@ void DebugUI::Draw()
                 }
             }
 
+            // ---- Level (C4): combat level from kills
+            if (player && ImGui::CollapsingHeader("Level", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                const int need = XpToNextLevel(player->GetLevel());
+                ImGui::Text("Level %d    kills %d", player->GetLevel(), player->GetKills());
+                char overlay[32];
+                snprintf(overlay, sizeof(overlay), "%d / %d XP", player->GetXp(), need);
+                ImGui::ProgressBar((float)player->GetXp() / need, ImVec2(-1.0f, 0.0f), overlay);
+                if (ImGui::Button("Give 10 XP##combat"))
+                {
+                    player->GainXp(10, MonsterType::Slime);
+                    Log("[debug] gave 10 combat XP");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Level up##combat"))
+                {
+                    player->GainXp(need - player->GetXp(), MonsterType::Goblin);
+                    Log("[debug] forced a combat level-up (goblin odds)");
+                }
+                ImGui::TextDisabled("XP per kill on this floor:");
+                for (int t = 0; t < kMonsterTypeCount; t++)
+                {
+                    if (t > 0)
+                        ImGui::SameLine();
+                    ImGui::TextDisabled("%s %d", kMonster[t].name, KillXp(kMonster[t].xp, map ? map->GetFloor() : 1));
+                }
+            }
+
+
             // ---- Mining
             if (player && ImGui::CollapsingHeader("Mining", ImGuiTreeNodeFlags_DefaultOpen))
             {

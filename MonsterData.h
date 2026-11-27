@@ -28,6 +28,8 @@ struct MonsterDef
     float radius;       // collision half-width / circle radius
     float height;       // sprite height in tiles
     float knockback;    // multiplier on knockback taken (the brute shrugs off 2/3)
+    int   xp;           // C4: base XP per kill, x (1 + 0.15 per floor below the first)
+    int   cardTier;     // C4: rarity row for the level-up pick it causes (0 common .. 2 rare)
     SpriteDef sprite;
 };
 
@@ -35,19 +37,19 @@ static const int kMonsterTypeCount = (int)MonsterType::Count;
 
 static const MonsterDef kMonster[kMonsterTypeCount] =
 {
-    { "Cave Slime", 8.0f, 2, 1.0f, 6.0f, 0.32f, 0.80f, 1.0f,
+    { "Cave Slime", 8.0f, 2, 1.0f, 6.0f, 0.32f, 0.80f, 1.0f, 3, 0,
       { { "........", "........", "..pppp..", ".pwpppp.", ".peppep.", "pppppppp", "pppppppp", ".pppppp." },
         { { 'p', 0x9a6be0 },{ 'w', 0xd6c2ff },{ 'e', 0x1a1024 },{ 0, 0 } } } },
 
-    { "Gloom Bat", 4.0f, 1, 3.3f, 8.0f, 0.25f, 0.75f, 1.0f,
+    { "Gloom Bat", 4.0f, 1, 3.3f, 8.0f, 0.25f, 0.75f, 1.0f, 2, 0,
       { { "........", "........", "r.r..r.r", "rrrrrrrr", "rryrryrr", ".rrrrrr.", "r..rr..r", "........" },
         { { 'r', 0xc25a5a },{ 'y', 0xffd166 },{ 0, 0 },{ 0, 0 } } } },
 
-    { "Goblin", 12.0f, 3, 2.7f, 9.0f, 0.30f, 1.00f, 1.0f,
+    { "Goblin", 12.0f, 3, 2.7f, 9.0f, 0.30f, 1.00f, 1.0f, 6, 1,
       { { "..g..g..", "..gggg..", ".grggrg.", "..gggg..", ".tttttt.", "g.tttt.g", "..tttt..", "..t..t.." },
         { { 'g', 0x7d8c3a },{ 'r', 0xff5a4a },{ 't', 0x6a4a2e },{ 0, 0 } } } },
 
-    { "Stone Brute", 32.0f, 5, 1.3f, 7.0f, 0.44f, 1.50f, 1.0f / 3.0f,
+    { "Stone Brute", 32.0f, 5, 1.3f, 7.0f, 0.44f, 1.50f, 1.0f / 3.0f, 15, 2,
       { { "..oooo..", ".oooooo.", ".okooko.", ".owwwwo.", "oooooooo", "otttttto", ".tt..tt.", "oo....oo" },
         { { 'o', 0x8d8f99 },{ 'k', 0x1a1414 },{ 't', 0x5b4636 },{ 'w', 0xe8e0d0 } } } },
 };
@@ -58,3 +60,13 @@ static const SpriteDef kPotionSprite =
     { "........", "...kk...", "...gg...", "..rrrr..", ".rrwrrr.", ".rrrrrr.", ".rrrrrr.", "..rrrr.." },
     { { 'g', 0xcfd8dc },{ 'r', 0xd0554f },{ 'w', 0xffb3a8 },{ 'k', 0x6a4a2e } }
 };
+
+// C4: combat XP needed to go from this level to the next (the old mining curve)
+inline int XpToNextLevel(int level) { return 8 + 7 * (level - 1); }
+
+// C4: XP a kill gives on this floor: round(base x (1 + 0.15 x (floor - 1)))
+inline int KillXp(int baseXp, int floor)
+{
+    const float scale = 1.0f + 0.15f * (float)((floor > 1 ? floor : 1) - 1);
+    return (int)(baseXp * scale + 0.5f);
+}

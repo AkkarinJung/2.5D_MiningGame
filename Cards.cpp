@@ -25,14 +25,15 @@ void Cards::Init()
     CardPickOpen() = false;
 }
 
-void Cards::OddsFor(int oreGrade, float out[3]) const
+void Cards::OddsFor(int grade, int level, float out[3]) const
 {
     const Player* player = Manager::GetGameObj<Player>();
     const float luck = player ? player->GetLuck() : 0.0f;
-    const int level = player ? player->GetMineLevel() : 1;
+    grade = std::min(std::max(grade, 0), kOreCount - 1);
 
-    float w[3] = { (float)kOre[oreGrade].cardWeights[0], (float)kOre[oreGrade].cardWeights[1],
-                   (float)kOre[oreGrade].cardWeights[2] };
+    // Monster card tiers 0-2 use the same rows as copper, silver and gold ore
+    float w[3] = { (float)kOre[grade].cardWeights[0], (float)kOre[grade].cardWeights[1],
+                   (float)kOre[grade].cardWeights[2] };
     const float shift = std::min(0.85f, luck + 0.03f * (level - 1));
     const float moved = w[0] * shift;
     w[0] -= moved;
@@ -48,7 +49,7 @@ void Cards::DealHand(const PendingPick& pick)
     const Player* player = Manager::GetGameObj<Player>();
     const int cls = player ? (int)player->GetClass() : -1;
 
-    OddsFor(pick.oreGrade, m_Odds);
+    OddsFor(pick.grade, pick.level, m_Odds);
 
     // Pool: shared cards plus this class's cards, minus any at their stack limit
     int pool[kCardCount];
@@ -146,7 +147,7 @@ void Cards::Update()
 
     // ---- the pick window
     const PendingPick& pick = m_Pending.front();
-    const OreDef& ore = kOre[pick.oreGrade];
+    const OreDef& ore = kOre[std::min(std::max(pick.grade, 0), kOreCount - 1)];
     const ImVec2 size(240.0f * m_HandSize + 40.0f, 360.0f);
     ImGui::SetNextWindowPos(ImVec2((SCREEN_WIDTH - size.x) * 0.5f, (SCREEN_HEIGHT - size.y) * 0.5f));
     ImGui::SetNextWindowSize(size);
@@ -154,11 +155,23 @@ void Cards::Update()
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar);
 
     ImGui::PushFont(NULL, 26.0f);
-    ImGui::TextColored(ImVec4(0.73f, 0.88f, 0.48f, 1.0f), Tr("Mining Lv%d! Choose a card"), pick.level);
+    if (pick.fromKill)
+        ImGui::TextColored(ImVec4(0.73f, 0.88f, 0.48f, 1.0f), Tr("Level %d! Choose a card"), pick.level);
+    else
+        ImGui::TextColored(ImVec4(0.73f, 0.88f, 0.48f, 1.0f), Tr("Mining Lv%d! Choose a card"), pick.level);
     ImGui::PopFont();
     ImGui::PushFont(NULL, 18.0f);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ore.r, ore.g, ore.b, 1.0f));
-    ImGui::TextWrapped(Tr("You levelled up on %s. Better ore means rarer cards. Keep one."), Tr(ore.name));
+    if (pick.fromKill)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.92f, 0.80f, 0.62f, 1.0f));
+        ImGui::TextWrapped(Tr("You levelled up by slaying a %s. Tougher monsters mean rarer cards."),
+            Tr(kMonster[(int)pick.killer].name));
+    }
+    else
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(ore.r, ore.g, ore.b, 1.0f));
+        ImGui::TextWrapped(Tr("You levelled up on %s. Better ore means rarer cards. Keep one."), Tr(ore.name));
+    }
     ImGui::PopStyleColor();
     for (int r = 0; r < 3; r++)
     {

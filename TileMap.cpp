@@ -71,9 +71,15 @@ namespace
         ScratchImage image;
         LoadFromWICFile(path, WIC_FLAGS_NONE, &metadata, image);
 
+        // Large textures (e.g. 1254 px) shimmer at a distance without mipmaps: build the chain
+        ScratchImage mips;
+        const bool hasMips = SUCCEEDED(GenerateMipMaps(image.GetImages(), image.GetImageCount(),
+            image.GetMetadata(), TEX_FILTER_DEFAULT, 0, mips));
+        const ScratchImage& use = hasMips ? mips : image;
+
         ID3D11ShaderResourceView* srv = nullptr;
-        CreateShaderResourceView(Renderer::GetDevice(), image.GetImages(),
-            image.GetImageCount(), metadata, &srv);
+        CreateShaderResourceView(Renderer::GetDevice(), use.GetImages(), use.GetImageCount(),
+            use.GetMetadata(), &srv);
         assert(srv);
         return srv;
     }
@@ -116,29 +122,6 @@ namespace
     {
         auto c = [](int v) { return (uint32_t)std::min(std::max(v, 0), 255); };
         return 0xFF000000u | (c(b) << 16) | (c(g) << 8) | c(r);
-    }
-
-    // 64x64 grass: speckled greens and a few small flowers (fixed seed: same every run)
-    std::vector<uint32_t> MakeGrassPixels()
-    {
-        const int n = 64;
-        std::mt19937 rng(1234u);
-        std::uniform_int_distribution<int> jitter(-14, 14);
-        std::vector<uint32_t> px(n * n);
-        for (int i = 0; i < n * n; i++)
-        {
-            const int v = jitter(rng);
-            const bool dark = (rng() % 7) == 0;
-            px[i] = dark ? Pixel(70 + v, 128 + v, 52 + v) : Pixel(96 + v, 164 + v, 70 + v);
-        }
-        const uint32_t petals[3] = { Pixel(250, 248, 236), Pixel(250, 222, 90), Pixel(240, 150, 190) };
-        for (int f = 0; f < 9; f++)
-        {
-            const int x = rng() % (n - 1), y = rng() % (n - 1);
-            const uint32_t c = petals[f % 3];
-            px[y * n + x] = c; px[y * n + x + 1] = c; px[(y + 1) * n + x] = c; px[(y + 1) * n + x + 1] = c;
-        }
-        return px;
     }
 
     // 32x32 hedge: dark leafy greens
@@ -209,9 +192,9 @@ void TileMap::Init()
     VERTEX_3D floorV[4] =
     {
         MakeVertex(XMFLOAT3(0, 0, h), up, 1.0f, XMFLOAT2(0, 0)),
-        MakeVertex(XMFLOAT3(w, 0, h), up, 1.0f, XMFLOAT2(w, 0)),
-        MakeVertex(XMFLOAT3(0, 0, 0), up, 1.0f, XMFLOAT2(0, h)),
-        MakeVertex(XMFLOAT3(w, 0, 0), up, 1.0f, XMFLOAT2(w, h)),
+        MakeVertex(XMFLOAT3(w, 0, h), up, 1.0f, XMFLOAT2(w / 3.0f, 0)),
+        MakeVertex(XMFLOAT3(0, 0, 0), up, 1.0f, XMFLOAT2(0, h / 3.0f)),
+        MakeVertex(XMFLOAT3(w, 0, 0), up, 1.0f, XMFLOAT2(w / 3.0f, h / 3.0f)),
     };
     m_FloorVB = CreateVB(floorV, 4);
 
@@ -234,7 +217,7 @@ void TileMap::Init()
         MakeVertex(XMFLOAT3(w, 0, 0), up, 1.0f, XMFLOAT2(w / 4.0f, h / 4.0f)),
     };
     m_TownFloorVB = CreateVB(townV, 4);
-    m_GrassTexture = CreateTextureRGBA(64, 64, MakeGrassPixels());
+    m_GrassTexture = LoadTexture(L"asset\\texture\\Grass.png");
     m_HedgeTexture = CreateTextureRGBA(32, 32, MakeHedgePixels());
     BuildTreeMesh();
 

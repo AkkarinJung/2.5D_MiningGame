@@ -23,7 +23,29 @@ inline float& HitStopTimer()
     return seconds;
 }
 
+// The craft menu (C key, Crafting Update C3) is open. Nothing opens it yet.
+inline bool& CraftMenuOpen()
+{
+    static bool open = false;
+    return open;
+}
+
 inline bool GamePaused()
 {
-    return CardPickOpen() || PromptOpen() || HitStopTimer() > 0.0f;
+    return CardPickOpen() || PromptOpen() || CraftMenuOpen() || HitStopTimer() > 0.0f;
+}
+
+// Counts for the current run, shown on the death and restart prompts (Crafting Update C4).
+// Reset when a run starts. Nothing fills them yet.
+struct RunStats
+{
+    int kills = 0;
+    int itemsCrafted = 0;
+    int weaponsCrafted = 0;
+};
+
+inline RunStats& CurrentRun()
+{
+    static RunStats stats;
+    return stats;
 }

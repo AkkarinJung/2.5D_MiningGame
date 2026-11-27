@@ -317,6 +317,78 @@ void DebugUI::Draw()
                 }
             }
 
+            // ---- Bag (C1)
+            Pickups* pickups = Manager::GetGameObj<Pickups>();
+            if (player && ImGui::CollapsingHeader("Bag"))
+            {
+                Inventory& bag = player->GetBag();
+                ImGui::Text("Slots %d / %d used    pickups on floor %d", bag.UsedSlots(), bag.SlotCount(),
+                    pickups ? pickups->Count() : 0);
+
+                // Add any material x1 / x10 (anything that does not fit drops at your feet)
+                if (ImGui::BeginTable("##addmat", 3, ImGuiTableFlags_SizingFixedFit))
+                {
+                    for (int m = 0; m < kMatCount; m++)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn();
+                        ImGui::Text("%s (%d)", kMat[m].name, bag.Count((MatId)m));
+                        ImGui::TableNextColumn();
+                        ImGui::PushID(m);
+                        if (ImGui::SmallButton("+1"))
+                            player->AddToBagOrDrop((MatId)m, 1);
+                        ImGui::TableNextColumn();
+                        if (ImGui::SmallButton("+10"))
+                            player->AddToBagOrDrop((MatId)m, 10);
+                        ImGui::PopID();
+                    }
+                    ImGui::EndTable();
+                }
+
+                // Drop a slot (tests "not grabbed again until you step away")
+                for (int i = 0; i < bag.SlotCount(); i++)
+                {
+                    const Inventory::Slot s = bag.GetSlot(i);      // a copy: dropping empties the slot
+                    if (!s.used)
+                        continue;
+                    ImGui::PushID(1000 + i);
+                    if (ImGui::SmallButton("x"))
+                    {
+                        Log("[debug] dropped %d %s", s.n, kMat[(int)s.id].name);
+                        player->DropBagSlot(i);
+                    }
+                    ImGui::PopID();
+                    ImGui::SameLine();
+                    ImGui::Text("slot %d: %s x%d", i + 1, kMat[(int)s.id].name, s.n);
+                }
+
+                if (ImGui::Button("Clear bag"))
+                {
+                    bag.Clear();
+                    Log("[debug] emptied the bag");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Fill bag (Bag full test)"))
+                {
+                    bag.Add(MatId::Stone, bag.Room(MatId::Stone));
+                    Log("[debug] filled the bag with stone");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Spawn copper here") && pickups)
+                {
+                    const Vector3 p = player->GetPosition();
+                    for (int k = 0; k < 3; k++)
+                        pickups->Spawn(MatId::Copper, 2, p.x, p.z);
+                }
+
+                int slots = bag.SlotCount();
+                if (ImGui::SliderInt("Slot count", &slots, kBagSlotsStart, Inventory::kMaxSlots))
+                    bag.SetSlotCount(slots);
+                Pickups::Settings& ps = Pickups::GetSettings();
+                ImGui::SliderFloat("Magnet radius", &ps.magnetRadius, 0.5f, 5.0f, "%.2f");
+                ImGui::SliderFloat("Retry delay (bag full)", &ps.retryDelay, 0.2f, 3.0f, "%.1f s");
+            }
+
 
             // ---- Cards
             Cards* cards = Manager::GetGameObj<Cards>();

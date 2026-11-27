@@ -222,13 +222,14 @@ void Prompts::DrawRestart()
     TileMap* map = Manager::GetGameObj<TileMap>();
     Cards* cards = Manager::GetGameObj<Cards>();
 
-    if (BeginPrompt("restart", 480.0f, 260.0f))
+    if (BeginPrompt("restart", 480.0f, 290.0f))
     {
         Title(Tr("Restart this run?"));
         const int cardCount = cards ? cards->TotalOwned() : 0;
-        ImGui::TextWrapped(Tr("Your run (%s, floor %d, Mining Lv%d, %d cards) will be lost."),
+        ImGui::TextWrapped(Tr("Your run (%s, floor %d, Level %d, %d kills, %d cards) will be lost."),
             Tr(kClass[(int)player->GetClass()].name), map->GetFloor(),
-            player->GetMineLevel(), cardCount);
+            player->GetLevel(), player->GetKills(), cardCount);
+        ImGui::TextWrapped("%s", Tr("Everything in your bag will be lost."));
         ImGui::Spacing();
 
         const int choice = TwoButtons(Tr("Same class"), Tr("New class"));
@@ -256,8 +257,8 @@ void Prompts::DrawDeath()
         snprintf(title, sizeof(title), Tr("Slain by the %s"), Tr(player->GetKilledBy()));
         Title(title, ImVec4(0.82f, 0.33f, 0.31f, 1.0f));
 
-        ImGui::Text(Tr("%s  -  floor %d  -  Mining Lv%d"), Tr(kClass[(int)player->GetClass()].name),
-            map->GetFloor(), player->GetMineLevel());
+        ImGui::Text(Tr("%s  -  floor %d  -  Level %d  -  Mining Lv%d"), Tr(kClass[(int)player->GetClass()].name),
+            map->GetFloor(), player->GetLevel(), player->GetMineLevel());
         ImGui::Text(Tr("%d kills   %d blocks   %d cards"), player->GetKills(), player->GetBlocksBroken(),
             cards ? cards->TotalOwned() : 0);
         const SaveData::RecordsData& records = SaveData::Records();

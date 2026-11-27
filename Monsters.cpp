@@ -16,6 +16,7 @@
 #include "DebugUI.h"
 #include "Pickups.h"
 #include <cmath>
+#include <cstdio>
 #include <algorithm>
 #include <climits>
 
@@ -585,7 +586,15 @@ bool Monsters::Damage(Monster& m, float damage, float fromX, float fromZ, float 
     DebugUI::Log("You defeated the %s.", Tr(def.name));
     Juice::MonsterKilled(m.x, m.z);
     if (player)
-        player->OnKill();               // Leech
+    {
+        player->OnKill();               // Leech, kill count
+        // C4: combat XP, more on deeper floors
+        const int xp = KillXp(def.xp, m_FloorNo);
+        char text[16];
+        snprintf(text, sizeof(text), "+%d XP", xp);
+        Juice::Number(m.x, def.height + 0.3f, m.z, text, 0xbbe07a);
+        player->GainXp(xp, m.type);
+    }
     Pickups* pickups = Manager::GetGameObj<Pickups>();
     if (pickups && std::uniform_real_distribution<float>(0.0f, 1.0f)(m_Rng) < 0.06f)
         pickups->Spawn(MatId::Potion, 1, m.x, m.z);     // 6% potion drop (C1), pops out and bounces

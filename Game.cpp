@@ -21,6 +21,7 @@
 
 void Game::Init()
 {
+    CurrentRun() = RunStats();          // fresh kill / craft counts for the new run
     Manager::AddGameObj<Camera>();
     TileMap* map = Manager::AddGameObj<TileMap>();
     Player* player = Manager::AddGameObj<Player>();

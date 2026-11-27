@@ -618,10 +618,32 @@ bool Player::TakeDamage(int amount, float fromX, float fromZ, const char* source
     return true;
 }
 
+// C4: combat XP from kills. Level-ups queue up; each gives +2 max HP and a card pick.
+void Player::GainXp(int xp, MonsterType killer)
+{
+    if (xp <= 0 || IsDead())
+        return;
+    Cards* cards = Manager::GetGameObj<Cards>();
+    m_Xp += xp;
+    while (m_Xp >= XpToNextLevel(m_Level))
+    {
+        m_Xp -= XpToNextLevel(m_Level);
+        m_Level++;
+        m_MaxHp += 2;
+        m_Hp = std::min(m_MaxHp, m_Hp + 2);
+
+        DebugUI::Log("Level %d! (+2 max HP)", m_Level);
+        Juice::LevelUp(m_Position.x, m_Position.z, m_Level, false);
+        if (cards)
+            cards->QueueKillLevelUp(killer, m_Level);   // odds from the monster's card tier
+    }
+}
+
 // Leech: heal on every kill.
 void Player::OnKill()
 {
     m_Kills++;
+    CurrentRun().kills++;
     if (m_Leech > 0 && !IsDead() && m_Hp < m_MaxHp)
     {
         const int heal = std::min(m_Leech, m_MaxHp - m_Hp);

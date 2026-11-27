@@ -131,6 +131,19 @@ void Hud::Update()
     ImGui::SameLine();
     ImGui::Text("%d", player->GetArmor());
 
+
+    // Row 2b (C4): combat level + XP bar
+    {
+        const int lvNeed = XpToNextLevel(player->GetLevel());
+        ImGui::TextColored(kDim, "%s", Tr("Level"));
+        ImGui::SameLine(90.0f);
+        ImGui::TextColored(kLamp, "%d", player->GetLevel());
+        ImGui::SameLine();
+        char xpText[32];
+        snprintf(xpText, sizeof(xpText), "%d / %d XP", player->GetXp(), lvNeed);
+        Bar((float)player->GetXp() / lvNeed, kLamp, -1.0f, xpText);
+    }
+
     // Row 3: skill cooldown
     const float left = std::max(0.0f, player->GetSkillTimer());
     if (left > 0.0f)

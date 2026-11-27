@@ -283,10 +283,10 @@ void Juice::Explosion(float x, float z)
     HitStop(0.05f);
 }
 
-void Juice::LevelUp(float x, float z, int level)
+void Juice::LevelUp(float x, float z, int level, bool mining)
 {
     char text[32];
-    snprintf(text, sizeof(text), Tr("Mining Lv%d!"), level);
+    snprintf(text, sizeof(text), mining ? Tr("Mining Lv%d!") : Tr("Level %d!"), level);
     Number(x, 1.5f, z, text, 0xb9e07a, true);
     if (!g_Instance || !g_Settings.levelUpBurst)
         return;

@@ -169,3 +169,11 @@ Stone Core	岩のコア
 Potion	回復薬
 Bomb	爆弾
 Torch	たいまつ
+Level %d! Choose a card	Lv%d! カードを選べ
+You levelled up by slaying a %s. Tougher monsters mean rarer cards.	%sを倒してレベルが上がった。強い敵ほどレアなカードが出やすい。
+Level %d! (+2 max HP)	Lv%d!（最大HP +2）
+Level %d!	Lv%d!
+Level	Lv
+Your run (%s, floor %d, Level %d, %d kills, %d cards) will be lost.	いまの進行（%s・B%dF・Lv%d・撃破%d・カード%d枚）は失われる。
+Everything in your bag will be lost.	カバンの中身もすべて失われる。
+%s  -  floor %d  -  Level %d  -  Mining Lv%d	%s・到達 B%dF・Lv%d・採掘Lv%d

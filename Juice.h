@@ -43,7 +43,7 @@ public:
     static void PlayerHurt(float x, float z, int damage);
     static void Heal(float x, float z, int amount);
     static void Explosion(float x, float z);
-    static void LevelUp(float x, float z, int level);
+    static void LevelUp(float x, float z, int level, bool mining = true);  // C4: false = combat level
 
     static Settings& GetSettings();
     static int ParticleCount();

@@ -5,6 +5,7 @@
 #include "ClassData.h"
 #include "CardData.h"
 #include "Inventory.h"
+#include "MonsterData.h"
 
 class Player : public GameObject
 {
@@ -48,6 +49,8 @@ private:
     // Mining (M3). Fixed Miner values until classes arrive in M5.
     int   m_MineLevel = 1;
     float m_MineXp = 0.0f;
+    int   m_Level = 1;              // C4: combat level from monster kills
+    int   m_Xp = 0;
     float m_MinePower = 5.0f;
     float m_AttackCooldown = 0.0f;
     Vector3 m_Facing{ 0.0f, 0.0f, 1.0f };
@@ -126,6 +129,11 @@ public:
     void GainMiningXp(float xp, int oreGrade = 0);  // level-ups queue a card pick for this grade
     int GetMineLevel() const { return m_MineLevel; }
     float GetMineXp() const { return m_MineXp; }
+    // C4: kills give XP; each level-up gives +2 max HP and queues a card pick
+    // (rarity from the monster that caused it).
+    void GainXp(int xp, MonsterType killer);
+    int  GetLevel() const { return m_Level; }
+    int  GetXp() const { return m_Xp; }
     float GetMinePower() const { return m_MinePower; }
     float GetAttack() const { return m_Attack; }
 
